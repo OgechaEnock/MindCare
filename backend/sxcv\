@@ -1,0 +1,4 @@
+ id | user_id | notification_type | title | message | related_id | is_read | created_at 
+----+---------+-------------------+-------+---------+------------+---------+------------
+(0 rows)
+

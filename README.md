@@ -126,3 +126,35 @@ npm install
 cd frontend
 npm install
 
+##   Backend Configuration
+
+PORT=3000
+DB_USER=patient
+DB_PASSWORD=your_password
+DB_NAME=mental_health_db
+DB_HOST=localhost
+DB_PORT=5432
+ENCRYPTION_KEY=12345678901234567890123456789012
+JWT_SECRET=super_secure_random_secret
+FRONTEND_URL=http://localhost:3001
+
+##   Frontend Configuration
+
+REACT_APP_API_URL=http://localhost:3000
+
+##  Database Setup
+Run
+CREATE DATABASE mental_health_db;
+
+##  Run Schema
+psql -U patient -d mental_health_db -f schema.sql
+
+## Running the Application Backend
+cd backend
+npm run dev
+
+## Running the Application Frontend
+cd frontend
+npm start
+
+

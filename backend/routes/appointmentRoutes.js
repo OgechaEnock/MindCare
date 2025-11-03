@@ -7,7 +7,7 @@ import { getAppointmentStatus } from "../utils/timeUtils.js";
 const router = express.Router();
 
 /**
- * 📅 Add an appointment (Protected)
+ * Add an appointment 
  */
 router.post("/", authenticateToken, async (req, res) => {
   try {
@@ -35,7 +35,7 @@ router.post("/", authenticateToken, async (req, res) => {
     const appointmentId = result.rows[0].id;
     const status = getAppointmentStatus(result.rows[0].appointment_date, result.rows[0].appointment_time);
 
-    // ✅ Create notification for new appointment
+    // Create notification for new appointment
     if (status === 'Upcoming') {
       try {
         await pool.query(
@@ -49,7 +49,7 @@ router.post("/", authenticateToken, async (req, res) => {
           ]
         );
       } catch (notifErr) {
-        console.error("⚠️ Failed to create notification:", notifErr.message);
+        console.error("Failed to create notification:", notifErr.message);
         // Don't fail the whole request if notification fails
       }
     }
@@ -69,13 +69,13 @@ router.post("/", authenticateToken, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("❌ Add appointment error:", err.message);
+    console.error("Add appointment error:", err.message);
     res.status(500).json({ error: "Failed to add appointment" });
   }
 });
 
 /**
- * 📋 Get all appointments for current user (Protected)
+ * Get all appointments for current user
  */
 router.get("/", authenticateToken, async (req, res) => {
   try {
@@ -112,13 +112,13 @@ router.get("/", authenticateToken, async (req, res) => {
 
     res.json(decrypted);
   } catch (err) {
-    console.error("❌ Fetch appointments error:", err.message);
+    console.error("Fetch appointments error:", err.message);
     res.status(500).json({ error: "Failed to fetch appointments" });
   }
 });
 
 /**
- * 🗑️ Delete an appointment (Protected)
+ *  Delete an appointment 
  */
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
@@ -144,7 +144,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       [id, user_id]
     );
 
-    // ✅ Create notification for deleted appointment (only if it was upcoming)
+    // Create notification for deleted appointment
     if (status === 'Upcoming') {
       try {
         await pool.query(
@@ -158,13 +158,13 @@ router.delete("/:id", authenticateToken, async (req, res) => {
           ]
         );
       } catch (notifErr) {
-        console.error("⚠️ Failed to create notification:", notifErr.message);
+        console.error("Failed to create notification:", notifErr.message);
       }
     }
 
     res.json({ message: "Appointment deleted successfully" });
   } catch (err) {
-    console.error("❌ Delete appointment error:", err.message);
+    console.error("Delete appointment error:", err.message);
     res.status(500).json({ error: "Failed to delete appointment" });
   }
 });

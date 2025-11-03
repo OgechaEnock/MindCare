@@ -7,15 +7,15 @@ import medicationRoutes from "./routes/medicationRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import forumRoutes from "./routes/forumRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
-import notificationRoutes from "./routes/notificationRoutes.js"; // ✅ NEW
-import { initializeScheduler } from "./utils/scheduler.js"; // ✅ NEW
+import notificationRoutes from "./routes/notificationRoutes.js"; 
+import { initializeScheduler } from "./utils/scheduler.js"; 
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Middleware
+//  Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:3001",
   credentials: true
@@ -23,7 +23,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Request logging middleware (for development)
+//  Request logging middleware 
 if (process.env.NODE_ENV !== "production") {
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`);
@@ -31,50 +31,50 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// ✅ API Routes
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/medications", medicationRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/forum", forumRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/notifications", notificationRoutes); // ✅ NEW
+app.use("/api/notifications", notificationRoutes); 
 
-// ✅ Health check endpoint
+//  Health check endpoint
 app.get("/api/health", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
     res.json({ 
-      status: "✅ Server is running",
-      database: "✅ Connected",
+      status: "Server is running",
+      database: " Connected",
       server_time: result.rows[0].now 
     });
   } catch (err) {
     res.status(500).json({ 
-      status: "❌ Server error",
-      database: "❌ Disconnected",
+      status: " Server error",
+      database: "Disconnected",
       error: err.message 
     });
   }
 });
 
-// ✅ 404 handler
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// ✅ Global error handler
+//  Global error handler
 app.use((err, req, res, next) => {
-  console.error("❌ Global error:", err);
+  console.error(" Global error:", err);
   res.status(err.status || 500).json({
     error: err.message || "Internal server error",
     ...(process.env.NODE_ENV === "development" && { stack: err.stack })
   });
 });
 
-// ✅ Initialize notification scheduler
+// Initialize notification scheduler
 initializeScheduler();
 
-// ✅ Start server
+// Start server
 app.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════╗

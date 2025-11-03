@@ -6,7 +6,7 @@ import authenticateToken from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 /**
- * 📋 Get all medical history entries for user (Protected)
+ * Get all medical history entries for user 
  */
 router.get("/medical-history", authenticateToken, async (req, res) => {
   try {
@@ -33,13 +33,13 @@ router.get("/medical-history", authenticateToken, async (req, res) => {
 
     res.json(decrypted);
   } catch (err) {
-    console.error("❌ Get medical history error:", err.message);
+    console.error("Get medical history error:", err.message);
     res.status(500).json({ error: "Failed to fetch medical history" });
   }
 });
 
 /**
- * 📋 Get single medical history entry (Protected)
+ * Get single medical history entry 
  */
 router.get("/medical-history/:id", authenticateToken, async (req, res) => {
   try {
@@ -72,13 +72,13 @@ router.get("/medical-history/:id", authenticateToken, async (req, res) => {
 
     res.json(decrypted);
   } catch (err) {
-    console.error("❌ Get medical history entry error:", err.message);
+    console.error("Get medical history entry error:", err.message);
     res.status(500).json({ error: "Failed to fetch medical history entry" });
   }
 });
 
 /**
- * ➕ Add new medical history entry (Protected)
+ * ➕ Add new medical history entry 
  */
 router.post("/medical-history", authenticateToken, async (req, res) => {
   try {
@@ -111,13 +111,13 @@ router.post("/medical-history", authenticateToken, async (req, res) => {
       created_at: result.rows[0].created_at
     });
   } catch (err) {
-    console.error("❌ Add medical history error:", err.message);
+    console.error("Add medical history error:", err.message);
     res.status(500).json({ error: "Failed to add medical history entry" });
   }
 });
 
 /**
- * ✏️ Update medical history entry (Protected)
+ * Update medical history entry 
  */
 router.put("/medical-history/:id", authenticateToken, async (req, res) => {
   try {
@@ -150,13 +150,13 @@ router.put("/medical-history/:id", authenticateToken, async (req, res) => {
 
     res.json({ message: "Medical history entry updated successfully" });
   } catch (err) {
-    console.error("❌ Update medical history error:", err.message);
+    console.error("Update medical history error:", err.message);
     res.status(500).json({ error: "Failed to update medical history entry" });
   }
 });
 
 /**
- * 🗑️ Delete medical history entry (Protected)
+ * Delete medical history entry 
  */
 router.delete("/medical-history/:id", authenticateToken, async (req, res) => {
   try {
@@ -174,13 +174,13 @@ router.delete("/medical-history/:id", authenticateToken, async (req, res) => {
 
     res.json({ message: "Medical history entry deleted successfully" });
   } catch (err) {
-    console.error("❌ Delete medical history error:", err.message);
+    console.error("Delete medical history error:", err.message);
     res.status(500).json({ error: "Failed to delete medical history entry" });
   }
 });
 
 /**
- * 👤 Get user profile (Protected)
+ * Get user profile 
  */
 router.get("/", authenticateToken, async (req, res) => {
   try {
@@ -197,7 +197,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("❌ Get profile error:", err.message);
+    console.error("Get profile error:", err.message);
     res.status(500).json({ error: "Failed to fetch profile" });
   }
 });

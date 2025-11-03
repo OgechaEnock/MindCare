@@ -12,7 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
 /**
- * 📝 Register new user
+ * Register new user
  */
 router.post("/register", async (req, res) => {
   try {
@@ -48,8 +48,6 @@ router.post("/register", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Don't auto-create medical history anymore - users will add entries manually
-
     // Generate JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email, name: user.name },
@@ -67,13 +65,13 @@ router.post("/register", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("❌ Register error:", err.message);
+    console.error("Register error:", err.message);
     res.status(500).json({ error: "Registration failed" });
   }
 });
 
 /**
- * 🔐 Login user
+ * Login user
  */
 router.post("/login", async (req, res) => {
   try {
@@ -120,13 +118,13 @@ router.post("/login", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("❌ Login error:", err.message);
+    console.error("Login error:", err.message);
     res.status(500).json({ error: "Login failed" });
   }
 });
 
 /**
- * 👤 Get current user (protected route)
+ * Get current user 
  */
 router.get("/me", authenticateToken, async (req, res) => {
   try {
@@ -141,13 +139,13 @@ router.get("/me", authenticateToken, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("❌ Get user error:", err.message);
+    console.error("Get user error:", err.message);
     res.status(500).json({ error: "Failed to fetch user data" });
   }
 });
 
 /**
- * 🚪 Logout (client-side token removal)
+ * Logout 
  */
 router.post("/logout", authenticateToken, (req, res) => {
   res.json({ message: "Logout successful" });

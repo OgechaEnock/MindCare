@@ -6,7 +6,7 @@ dotenv.config();
 const SECRET_KEY = process.env.ENCRYPTION_KEY;
 
 if (!SECRET_KEY || SECRET_KEY.length < 32) {
-  console.error("⚠️  WARNING: ENCRYPTION_KEY must be at least 32 characters!");
+  console.error(" WARNING: ENCRYPTION_KEY must be at least 32 characters!");
 }
 
 /**

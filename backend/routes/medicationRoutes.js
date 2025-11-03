@@ -6,7 +6,7 @@ import authenticateToken from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 /**
- * 💊 Add a new medication (Protected)
+ * Add a new medication 
  */
 router.post("/", authenticateToken, async (req, res) => {
   try {
@@ -41,13 +41,13 @@ router.post("/", authenticateToken, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("❌ Add medication error:", err.message);
+    console.error("Add medication error:", err.message);
     res.status(500).json({ error: "Failed to add medication" });
   }
 });
 
 /**
- * 📋 Get all medications for current user (Protected)
+ * Get all medications for current user 
  */
 router.get("/", authenticateToken, async (req, res) => {
   try {
@@ -64,20 +64,20 @@ router.get("/", authenticateToken, async (req, res) => {
       name: decrypt(row.name),
       dosage: decrypt(row.dosage),
       frequency: decrypt(row.frequency),
-      reminder_enabled: row.reminder_enabled, // ✅ Added
-      reminder_times: row.reminder_times || [], // ✅ Added
+      reminder_enabled: row.reminder_enabled, 
+      reminder_times: row.reminder_times || [], 
       created_at: row.created_at
     }));
 
     res.json(decrypted);
   } catch (err) {
-    console.error("❌ Fetch medications error:", err.message);
+    console.error("Fetch medications error:", err.message);
     res.status(500).json({ error: "Failed to fetch medications" });
   }
 });
 
 /**
- * ✏️ Update medication reminder settings (Protected) ✅ NEW
+ * Update medication reminder settings
  */
 router.put("/:id/reminders", authenticateToken, async (req, res) => {
   try {
@@ -103,13 +103,13 @@ router.put("/:id/reminders", authenticateToken, async (req, res) => {
       reminder_times: reminderTimes
     });
   } catch (err) {
-    console.error("❌ Update reminder error:", err.message);
+    console.error("Update reminder error:", err.message);
     res.status(500).json({ error: "Failed to update reminder settings" });
   }
 });
 
 /**
- * 🗑️ Delete a medication (Protected)
+ *  Delete a medication 
  */
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
@@ -127,7 +127,7 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 
     res.json({ message: "Medication deleted successfully" });
   } catch (err) {
-    console.error("❌ Delete medication error:", err.message);
+    console.error("Delete medication error:", err.message);
     res.status(500).json({ error: "Failed to delete medication" });
   }
 });

@@ -11,9 +11,9 @@ export const createNotification = async (userId, type, title, message, relatedId
        VALUES ($1, $2, $3, $4, $5, NOW())`,
       [userId, type, title, message, relatedId]
     );
-    console.log(`✅ Notification created for user ${userId}: ${title}`);
+    console.log(`Notification created for user ${userId}: ${title}`);
   } catch (error) {
-    console.error("❌ Error creating notification:", error);
+    console.error("Error creating notification:", error);
   }
 };
 
@@ -31,7 +31,7 @@ export const getUserNotifications = async (userId) => {
     );
     return result.rows;
   } catch (error) {
-    console.error("❌ Error fetching notifications:", error);
+    console.error("Error fetching notifications:", error);
     return [];
   }
 };
@@ -48,19 +48,19 @@ export const markNotificationAsRead = async (notificationId, userId) => {
       [notificationId, userId]
     );
   } catch (error) {
-    console.error("❌ Error marking notification as read:", error);
+    console.error("Error marking notification as read:", error);
   }
 };
 
 /**
- * Check medication reminders (called every minute by scheduler)
+ * Check medication reminders 
  */
 export const checkMedicationReminders = async () => {
   try {
     const now = new Date();
-    const currentTime = now.toTimeString().substring(0, 5); // "HH:MM" format
+    const currentTime = now.toTimeString().substring(0, 5); 
     
-    console.log(`⏰ Checking medication reminders at ${currentTime}...`);
+    console.log(`Checking medication reminders at ${currentTime}...`);
 
     // Get all medications with reminders enabled
     const result = await pool.query(
@@ -82,26 +82,26 @@ export const checkMedicationReminders = async () => {
         await createNotification(
           med.user_id,
           'medication',
-          '💊 Medication Reminder',
+          ' Medication Reminder',
           `Time to take ${medName} (${medDosage})`,
           med.id
         );
         
-        console.log(`✅ Sent medication reminder: ${medName} to user ${med.user_id}`);
+        console.log(`Sent medication reminder: ${medName} to user ${med.user_id}`);
       }
     }
   } catch (error) {
-    console.error("❌ Error checking medication reminders:", error);
+    console.error(" Error checking medication reminders:", error);
   }
 };
 
 /**
- * Check appointment reminders (called every hour by scheduler)
+ * Check appointment reminders 
  */
 export const checkAppointmentReminders = async () => {
   try {
     const now = new Date();
-    console.log(`📅 Checking appointment reminders at ${now.toISOString()}...`);
+    console.log(`Checking appointment reminders at ${now.toISOString()}...`);
 
     // Check 24-hour reminders
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -125,7 +125,7 @@ export const checkAppointmentReminders = async () => {
       await createNotification(
         apt.user_id,
         'appointment',
-        '📅 Appointment Tomorrow',
+        ' Appointment Tomorrow',
         `${title} on ${dateStr} at ${apt.appointment_time}`,
         apt.id
       );
@@ -136,7 +136,7 @@ export const checkAppointmentReminders = async () => {
         [apt.id]
       );
       
-      console.log(`✅ Sent 24h appointment reminder: ${title} to user ${apt.user_id}`);
+      console.log(`Sent 24h appointment reminder: ${title} to user ${apt.user_id}`);
     }
 
     // Check 1-hour reminders
@@ -160,7 +160,7 @@ export const checkAppointmentReminders = async () => {
       await createNotification(
         apt.user_id,
         'appointment',
-        '⏰ Appointment in 1 Hour',
+        'Appointment in 1 Hour',
         `${title} at ${apt.appointment_time}`,
         apt.id
       );
@@ -171,10 +171,10 @@ export const checkAppointmentReminders = async () => {
         [apt.id]
       );
       
-      console.log(`✅ Sent 1h appointment reminder: ${title} to user ${apt.user_id}`);
+      console.log(`Sent 1h appointment reminder: ${title} to user ${apt.user_id}`);
     }
   } catch (error) {
-    console.error("❌ Error checking appointment reminders:", error);
+    console.error("Error checking appointment reminders:", error);
   }
 };
 

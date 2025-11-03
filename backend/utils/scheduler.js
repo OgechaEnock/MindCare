@@ -5,7 +5,7 @@ import { checkMedicationReminders, checkAppointmentReminders } from '../services
  * Initialize notification scheduler
  */
 export const initializeScheduler = () => {
-  console.log('⏰ Initializing notification scheduler...');
+  console.log('Initializing notification scheduler...');
 
   // Check medication reminders every minute
   cron.schedule('* * * * *', async () => {
@@ -17,7 +17,7 @@ export const initializeScheduler = () => {
     await checkAppointmentReminders();
   });
 
-  console.log('✅ Notification scheduler started!');
+  console.log('Notification scheduler started!');
   console.log('   - Medication reminders: Every minute');
   console.log('   - Appointment reminders: Every hour');
 };

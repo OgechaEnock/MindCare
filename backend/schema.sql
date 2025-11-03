@@ -1,7 +1,7 @@
--- Mental Health Support App - Complete Database Schema
+
 -- Run this in PostgreSQL
 
--- Drop existing tables if needed (be careful in production!)
+-- Drop existing tables if needed
 DROP TABLE IF EXISTS forum_posts CASCADE;
 DROP TABLE IF EXISTS appointments CASCADE;
 DROP TABLE IF EXISTS medications CASCADE;
@@ -20,7 +20,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Medical History table (encrypted sensitive data) - SUPPORTS MULTIPLE ENTRIES
+-- Medical History table
 CREATE TABLE medical_history (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -32,7 +32,7 @@ CREATE TABLE medical_history (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Medications table (encrypted sensitive data)
+-- Medications table 
 CREATE TABLE medications (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

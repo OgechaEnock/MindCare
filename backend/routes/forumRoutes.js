@@ -6,15 +6,13 @@ import authenticateToken from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-/**
- * 💬 Create a forum post with LLM moderation (Protected)
- * CRITICAL: Posts are moderated by the LLM API before being saved
- */
+// create forum post
 router.post("/threads", authenticateToken, async (req, res) => {
   try {
-    const { title, body } = req.body;
+    const { title, body, category } = req.body;
     const user_id = req.user.id;
 
+    // Validation
     if (!title || !body) {
       return res.status(400).json({ error: "Title and body are required" });
     }
@@ -23,149 +21,275 @@ router.post("/threads", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Title must be at least 5 characters" });
     }
 
+    if (title.length > 200) {
+      return res.status(400).json({ error: "Title must be 200 characters or less" });
+    }
+
     if (body.length < 10) {
       return res.status(400).json({ error: "Body must be at least 10 characters" });
     }
 
-    console.log("🔍 Moderating forum post...");
+    if (body.length > 5000) {
+      return res.status(400).json({ error: "Body must be 5000 characters or less" });
+    }
 
-    // ✅ CRITICAL: Moderate content using LLM API
-    const combinedText = `${title}\n\n${body}`;
+    console.log(" Moderating forum post...");
+
+    // CRITICAL: Moderate content using LLM API
+    const combinedText = `Title: ${title}\n\nBody: ${body}`;
     let moderationResult;
 
-    try {
-      moderationResult = await moderateText(combinedText);
-    } catch (moderationError) {
-      console.error("❌ Moderation service error:", moderationError.message);
-      
-      // Handle rate limit error
-      if (moderationError.message.includes("Rate limit")) {
-        return res.status(429).json({ 
-          error: "Rate limit exceeded. Please wait a moment and try again.",
-          retryAfter: 2 // seconds
-        });
-      }
-      
-      // Handle service unavailable
-      if (moderationError.message.includes("unavailable") || moderationError.message.includes("connect")) {
-        return res.status(503).json({ 
-          error: "Moderation service is currently unavailable. Please try again later.",
-          canRetry: true
-        });
-      }
-      
-      // Generic error
-      return res.status(503).json({ 
-        error: "Unable to moderate content at this time. Please try again later."
-      });
-    }
+    // The moderateText function now handles fallback internally
+    moderationResult = await moderateText(combinedText);
+
+    // Get user info for author name
+    const userResult = await pool.query(
+      "SELECT name FROM users WHERE id=$1",
+      [user_id]
+    );
+    const authorName = userResult.rows[0]?.name || "Anonymous";
+
+    // Determine approval status
+    let approvalStatus = 'approved';
+    let moderationNotes = null;
 
     // Check if content passed moderation
     if (!moderationResult.safety) {
-      console.log("🚫 Post rejected by moderation");
+      console.log("Post rejected by moderation");
       
-      // Store rejected post for audit (optional)
-      await pool.query(
-        `INSERT INTO forum_posts (user_id, content, approved, moderation_status, moderation_categories, created_at)
-         VALUES ($1, $2, false, 'rejected', $3, NOW())`,
-        [user_id, encrypt(combinedText), JSON.stringify(moderationResult.categories)]
-      );
-
-      return res.status(403).json({
-        error: "Your post could not be published due to safety concerns. Please review community guidelines.",
-        categories: moderationResult.categories,
-        status: "rejected"
+      return res.status(400).json({
+        error: "Your post cannot be published",
+        reason: "Content did not pass safety checks",
+        message: "Please review our community guidelines and try again.",
+        categories: moderationResult.categories || []
       });
     }
 
-    // ✅ Content is safe - encrypt and save
-    const encryptedContent = encrypt(body);
+    // If fallback was used, mark for manual review
+    if (moderationResult.fallback) {
+      approvalStatus = 'pending';
+      moderationNotes = 'Moderation service unavailable - pending manual review';
+      console.log("Using fallback moderation - post marked as pending");
+    }
+
+    // Content is safe - encrypt and save
     const encryptedTitle = encrypt(title);
+    const encryptedBody = encrypt(body);
 
     const result = await pool.query(
-      `INSERT INTO forum_posts (user_id, content, approved, moderation_status, moderation_categories, created_at)
-       VALUES ($1, $2, true, 'approved', $3, NOW()) RETURNING id, created_at`,
-      [user_id, encryptedContent, JSON.stringify(moderationResult.categories)]
+      `INSERT INTO forum_threads (user_id, title, body, category, author_name, approval_status, moderation_notes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) 
+       RETURNING id, created_at`,
+      [user_id, encryptedTitle, encryptedBody, category || 'general', authorName, approvalStatus, moderationNotes]
     );
 
-    console.log("✅ Post approved and published");
+    const threadId = result.rows[0].id;
 
-    res.status(201).json({
-      message: "Post published successfully after moderation",
-      status: "approved",
-      post: {
-        id: result.rows[0].id,
+    // Create notification for successful post
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, message, related_id, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [
+          user_id,
+          approvalStatus === 'approved' ? 'forum_post_published' : 'forum_post_pending',
+          approvalStatus === 'approved' 
+            ? `Your post "${title}" has been published`
+            : `Your post "${title}" is pending review`,
+          threadId
+        ]
+      );
+    } catch (notifErr) {
+      console.error("Failed to create notification:", notifErr.message);
+    }
+
+    console.log(`Post ${approvalStatus} - ID: ${threadId}`);
+
+    // Return response based on approval status
+    if (approvalStatus === 'pending') {
+      return res.status(201).json({
+        id: threadId,
         title,
         body,
+        category: category || 'general',
+        author_name: authorName,
+        approval_status: approvalStatus,
         created_at: result.rows[0].created_at,
-        moderation_categories: moderationResult.categories
-      }
+        message: 'Your post has been submitted and is pending review by moderators.',
+        warning: 'Moderation service was temporarily unavailable.'
+      });
+    }
+
+    res.status(201).json({
+      id: threadId,
+      title,
+      body,
+      category: category || 'general',
+      author_name: authorName,
+      approval_status: approvalStatus,
+      created_at: result.rows[0].created_at,
+      message: "Your post has been published successfully!"
     });
 
   } catch (err) {
-    console.error("❌ Forum post error:", err.message);
+    console.error("Forum post error:", err);
     res.status(500).json({ error: "Failed to create forum post" });
   }
 });
 
 /**
- * 📜 Fetch all approved forum posts (Public/Protected)
+ * Fetch all approved forum posts 
  */
-router.get("/threads", async (req, res) => {
+router.get("/threads", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT 
-        fp.id, 
-        fp.content, 
-        fp.approved, 
-        fp.moderation_status,
-        fp.created_at,
-        u.name as author_name
-       FROM forum_posts fp
-       LEFT JOIN users u ON fp.user_id = u.id
-       WHERE fp.approved = true
-       ORDER BY fp.created_at DESC
-       LIMIT 50`
+        id, 
+        title,
+        body, 
+        category,
+        author_name,
+        approval_status,
+        created_at,
+        updated_at
+       FROM forum_threads
+       WHERE approval_status = 'approved'
+       ORDER BY created_at DESC
+       LIMIT 100`
     );
 
     // Decrypt content before sending
     const decryptedPosts = result.rows.map((row) => ({
       id: row.id,
-      title: "Forum Post", // You can add title field to schema if needed
-      body: decrypt(row.content),
+      title: decrypt(row.title),
+      body: decrypt(row.body),
+      category: row.category,
       author_name: row.author_name || "Anonymous",
-      status: row.moderation_status,
-      created_at: row.created_at
+      approval_status: row.approval_status,
+      created_at: row.created_at,
+      updated_at: row.updated_at
     }));
 
     res.json(decryptedPosts);
   } catch (err) {
-    console.error("❌ Fetch posts error:", err.message);
+    console.error("Fetch posts error:", err.message);
     res.status(500).json({ error: "Failed to fetch forum posts" });
   }
 });
 
 /**
- * 🗑️ Delete own forum post (Protected)
+ * Delete own forum post
  */
-router.delete("/posts/:id", authenticateToken, async (req, res) => {
+router.delete("/threads/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const user_id = req.user.id;
 
-    const result = await pool.query(
-      "DELETE FROM forum_posts WHERE id=$1 AND user_id=$2 RETURNING id",
+    console.log(`Attempting to delete post ${id} by user ${user_id}`);
+
+    // Get post details before deleting
+    const post = await pool.query(
+      "SELECT title, user_id FROM forum_threads WHERE id=$1",
+      [id]
+    );
+
+    if (post.rows.length === 0) {
+      console.log(`Post ${id} not found`);
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    // Check ownership
+    if (post.rows[0].user_id !== user_id) {
+      console.log(`User ${user_id} not authorized to delete post ${id}`);
+      return res.status(403).json({ error: "You are not authorized to delete this post" });
+    }
+
+    const title = decrypt(post.rows[0].title);
+
+    // Delete the post
+    const deleteResult = await pool.query(
+      "DELETE FROM forum_threads WHERE id=$1 AND user_id=$2 RETURNING id",
       [id, user_id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Post not found or unauthorized" });
+    if (deleteResult.rows.length === 0) {
+      console.log(`Failed to delete post ${id}`);
+      return res.status(500).json({ error: "Failed to delete post" });
     }
 
-    res.json({ message: "Post deleted successfully" });
+    console.log(`Post ${id} deleted successfully`);
+
+    // Create notification
+    try {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, message, related_id, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [user_id, 'forum_post_deleted', `Your post "${title}" has been deleted`, null]
+      );
+      console.log(`Delete notification created for user ${user_id}`);
+    } catch (notifErr) {
+      console.error("Failed to create notification:", notifErr.message);
+      
+    }
+
+    res.json({ 
+      message: "Post deleted successfully",
+      id: parseInt(id)
+    });
+
   } catch (err) {
-    console.error("❌ Delete post error:", err.message);
-    res.status(500).json({ error: "Failed to delete post" });
+    console.error("Delete post error:", err);
+    res.status(500).json({ 
+      error: "Failed to delete post",
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+/**
+ * Get single forum post by ID 
+ */
+router.get("/threads/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `SELECT 
+        id, 
+        title,
+        body, 
+        category,
+        author_name,
+        approval_status,
+        user_id,
+        created_at,
+        updated_at
+       FROM forum_threads
+       WHERE id=$1 AND approval_status = 'approved'`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    const row = result.rows[0];
+
+    res.json({
+      id: row.id,
+      title: decrypt(row.title),
+      body: decrypt(row.body),
+      category: row.category,
+      author_name: row.author_name || "Anonymous",
+      approval_status: row.approval_status,
+      is_author: row.user_id === req.user.id,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    });
+
+  } catch (err) {
+    console.error(" Get post error:", err.message);
+    res.status(500).json({ error: "Failed to fetch post" });
   }
 });
 

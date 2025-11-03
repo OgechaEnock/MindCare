@@ -1,4 +1,4 @@
-# 🧠 Mental Health Support Application
+#  MindCare
 
 A comprehensive web-based application designed to support individuals experiencing mental health challenges through medication management, appointment scheduling, and peer support via a moderated community forum.
 
@@ -9,7 +9,7 @@ A comprehensive web-based application designed to support individuals experienci
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 - [Overview](#overview)
 - [Features](#features)
 - [Technology Stack](#technology-stack)
@@ -32,9 +32,9 @@ A comprehensive web-based application designed to support individuals experienci
 
 ---
 
-## 🎯 Overview
+##  Overview
 
-The **Mental Health Support Application** is a full-stack educational project developed as part of a software engineering course.  
+The **Mental Health Support Application** is a full-stack project developed as part of a software engineering course.  
 It focuses on **requirements engineering**, **project planning**, **system implementation**, and **testing**.
 
 This platform enables users to:
@@ -42,41 +42,38 @@ This platform enables users to:
 - Manage medications and appointments  
 - Interact safely with a moderated mental health support community  
 - Receive notifications and reminders  
-
-> ⚠️ **Disclaimer:** This project is for **educational purposes only** and should not be used for clinical decision-making.
-
 ---
 
-## ✨ Features
+##  Features
 
-### 🔐 Authentication & Security
+###  Authentication & Security
 - Secure registration & login using **JWT**
 - Password hashing with **bcrypt**
 - AES-256 encryption for sensitive data
 - Protected routes and middleware authorization
 
-### 🏥 Health Management
+###  Health Management
 - CRUD operations for medical history (diagnoses, allergies, conditions)
 - Manage medications with reminder schedules
 - Add, update, and cancel appointments
 
-### 💬 Community Forum
+###  Community Forum
 - Peer-to-peer discussion board
 - AI-powered moderation for user safety
 - Ability to post, comment, and delete discussions
 
-### 🔔 Notifications
+###  Notifications
 - Real-time notifications for medications and appointments
 - In-app and push reminders
 - Notification center for viewing all alerts
 
-### 📊 Dashboard
+###  Dashboard
 - Displays upcoming appointments
 - Medication schedules and reminder summaries
 
 ---
 
-## 🛠️ Technology Stack
+##  Technology Stack
 
 **Backend**
 - Node.js (v18+)
@@ -102,5 +99,30 @@ This platform enables users to:
 
 ---
 
-## 🏗️ System Architecture
+##  Prerequisites
+
+Ensure these are installed:
+
+node --version  # v18+
+npm --version   # v8+
+psql --version  # v12+
+
+
+
+##  Installation
+
+##  Fork and Clone The Repository
+
+git clone https://github.com/yourusername/mental-health-app.git
+cd mental-health-app
+
+##  Backend Setup
+
+cd backend
+npm install
+
+##  Frontend Setup
+
+cd frontend
+npm install
 

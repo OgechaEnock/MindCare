@@ -102,8 +102,7 @@ function Navigation() {
                 <div className="d-flex align-items-center gap-2">
                   {/* Notification Bell */}
                   <NotificationBell />
-                  
-                  {/* User Info (desktop only) */}
+                  {/* User Info  */}
                   <div className="text-white me-2 d-none d-lg-block">
                     <small className="opacity-75">Welcome,</small>
                     <div className="fw-bold" style={{ fontSize: '0.9rem' }}>
@@ -257,7 +256,7 @@ function Navigation() {
           box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.3);
         }
 
-        /* Mobile responsiveness */
+        /*  responsiveness */
         @media (max-width: 991px) {
           .nav-link-custom {
             margin: 0.3rem 0;

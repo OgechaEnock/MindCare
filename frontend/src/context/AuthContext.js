@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 
 const AuthContext = createContext();
 
-// ✅ Configure axios base URL
+// Configure axios base URL
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
 axios.defaults.baseURL = API_BASE_URL;
 
@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Restore user session on mount
+  // Restore user session on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("authToken");
     if (storedToken) {
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  // ✅ Register function
+  // Register function
   const register = async (name, email, password) => {
     try {
       const res = await axios.post("/api/auth/register", { 
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ Login function
+  // Login function
   const login = async (email, password) => {
     try {
       const res = await axios.post("/api/auth/login", { 
@@ -110,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ Logout function
+  // Logout function
   const logout = () => {
     localStorage.removeItem("authToken");
     setUser(null);
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// ✅ Custom hook
+// Custom hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

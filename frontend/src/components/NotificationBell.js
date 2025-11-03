@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Dropdown, Badge } from 'react-bootstrap';
+import { Dropdown, Badge, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import api from '../services/api';
+import { 
+  getNotifications, 
+  getUnreadCount, 
+  markNotificationAsRead, 
+  markAllNotificationsAsRead,
+  deleteNotification 
+} from '../services/api';
 
 function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
@@ -19,19 +26,30 @@ function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const fetchNotifications = async () => {
     try {
-      const res = await api.get('/api/notifications');
-      setNotifications(res.data);
+      const data = await getNotifications();
+      setNotifications(data);
       
-      const unread = res.data.filter(n => !n.is_read).length;
+      const unread = data.filter(n => !n.is_read).length;
+      const previousUnread = unreadCount;
       setUnreadCount(unread);
 
-      // Show browser notification for new unread notifications
-      if (unread > 0 && Notification.permission === "granted") {
-        const latestUnread = res.data.find(n => !n.is_read);
+      // Show browser notification only for NEW unread notifications
+      if (unread > previousUnread && unread > 0 && Notification.permission === "granted") {
+        const latestUnread = data.find(n => !n.is_read);
         if (latestUnread) {
-          showBrowserNotification(latestUnread.title, latestUnread.message);
+          showBrowserNotification(
+            getNotificationTitle(latestUnread.type),
+            latestUnread.message
+          );
         }
       }
     } catch (err) {
@@ -39,40 +57,84 @@ function NotificationBell() {
     }
   };
 
+  const getNotificationTitle = (type) => {
+    const titles = {
+      'appointment_created': '📅 New Appointment',
+      'appointment_updated': '📝 Appointment Updated',
+      'appointment_cancelled': ' Appointment Cancelled',
+      'forum_post_published': ' Post Published',
+      'forum_post_pending': '⏳ Post Pending Review',
+      'forum_post_deleted': '🗑️ Post Deleted',
+      'medication_reminder': '💊 Medication Reminder'
+    };
+    return titles[type] || '🔔 Notification';
+  };
+
+  const getNotificationIcon = (type) => {
+    const icons = {
+      'appointment_created': 'bi-calendar-plus text-success',
+      'appointment_updated': 'bi-calendar-check text-primary',
+      'appointment_cancelled': 'bi-calendar-x text-danger',
+      'forum_post_published': 'bi-chat-dots text-info',
+      'forum_post_pending': 'bi-clock text-warning',
+      'forum_post_deleted': 'bi-trash text-danger',
+      'medication_reminder': 'bi-capsule text-primary'
+    };
+    return icons[type] || 'bi-bell text-secondary';
+  };
+
   const showBrowserNotification = (title, body) => {
-    if (Notification.permission === "granted") {
-      new Notification(title, {
-        body: body,
-        icon: '/logo192.png',
-        badge: '/logo192.png',
-        tag: 'medication-reminder'
-      });
+    if ('Notification' in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, {
+          body: body,
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          tag: 'mindcare-notification',
+          requireInteraction: false
+        });
+      } catch (error) {
+        console.error('Failed to show browser notification:', error);
+      }
     }
   };
 
-  const markAsRead = async (id) => {
+  const handleMarkAsRead = async (id, e) => {
+    e.stopPropagation(); 
     try {
-      await api.put(`/api/notifications/${id}/read`);
-      fetchNotifications();
+      await markNotificationAsRead(id);
+      await fetchNotifications();
     } catch (err) {
       console.error('Mark as read error:', err);
+      toast.error('Failed to mark notification as read');
     }
   };
 
-  const markAllAsRead = async () => {
+  const handleMarkAllAsRead = async () => {
+    if (unreadCount === 0) return;
+    
     setLoading(true);
     try {
-      const unreadNotifications = notifications.filter(n => !n.is_read);
-      await Promise.all(
-        unreadNotifications.map(n => api.put(`/api/notifications/${n.id}/read`))
-      );
-      fetchNotifications();
+      await markAllNotificationsAsRead();
+      await fetchNotifications();
       toast.success('All notifications marked as read');
     } catch (err) {
       console.error('Mark all as read error:', err);
       toast.error('Failed to mark notifications as read');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    try {
+      await deleteNotification(id);
+      await fetchNotifications();
+      toast.success('Notification deleted');
+    } catch (err) {
+      console.error('Delete notification error:', err);
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -88,15 +150,18 @@ function NotificationBell() {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   return (
-    <Dropdown align="end">
+    <Dropdown align="end" show={show} onToggle={(isOpen) => setShow(isOpen)}>
       <Dropdown.Toggle 
         variant="link" 
         id="notification-dropdown"
-        className="text-white position-relative p-2"
+        className="text-white position-relative p-2 notification-bell-toggle"
         style={{ textDecoration: 'none' }}
       >
         <i className="bi bi-bell" style={{ fontSize: '1.3rem' }}></i>
@@ -104,7 +169,7 @@ function NotificationBell() {
           <Badge 
             bg="danger" 
             pill 
-            className="position-absolute top-0 start-100 translate-middle"
+            className="position-absolute top-0 start-100 translate-middle notification-badge"
             style={{ fontSize: '0.7rem' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -112,58 +177,156 @@ function NotificationBell() {
         )}
       </Dropdown.Toggle>
 
-      <Dropdown.Menu style={{ width: '350px', maxHeight: '500px', overflowY: 'auto' }}>
-        <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
-          <h6 className="mb-0">Notifications</h6>
+      <Dropdown.Menu className="notification-menu shadow">
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+          <h6 className="mb-0 fw-bold">
+            <i className="bi bi-bell me-2"></i>
+            Notifications
+          </h6>
           {unreadCount > 0 && (
             <Button 
               variant="link" 
               size="sm" 
-              className="text-decoration-none p-0"
-              onClick={markAllAsRead}
+              className="text-primary text-decoration-none p-0 fw-semibold"
+              onClick={handleMarkAllAsRead}
               disabled={loading}
             >
+              {loading ? (
+                <span className="spinner-border spinner-border-sm me-1"></span>
+              ) : (
+                <i className="bi bi-check-all me-1"></i>
+              )}
               Mark all read
             </Button>
           )}
         </div>
 
-        {notifications.length === 0 ? (
-          <div className="text-center py-4 text-muted">
-            <i className="bi bi-bell-slash" style={{ fontSize: '2rem' }}></i>
-            <p className="mb-0 mt-2">No notifications</p>
-          </div>
-        ) : (
-          <>
-            {notifications.map((notification) => (
-              <Dropdown.Item
-                key={notification.id}
-                className={`px-3 py-3 ${!notification.is_read ? 'bg-light' : ''}`}
-                onClick={() => !notification.is_read && markAsRead(notification.id)}
-                style={{ whiteSpace: 'normal', cursor: 'pointer' }}
-              >
-                <div className="d-flex justify-content-between align-items-start">
-                  <div className="flex-grow-1">
-                    <div className="d-flex align-items-center mb-1">
-                      {notification.notification_type === 'medication' ? (
-                        <i className="bi bi-capsule text-primary me-2"></i>
-                      ) : (
-                        <i className="bi bi-calendar-event text-success me-2"></i>
-                      )}
-                      <strong className="small">{notification.title}</strong>
+        {/* Notifications List */}
+        <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+          {notifications.length === 0 ? (
+            <div className="text-center py-5 text-muted">
+              <i className="bi bi-bell-slash" style={{ fontSize: '2.5rem' }}></i>
+              <p className="mb-0 mt-3">No notifications yet</p>
+              <small>You'll see updates about your appointments and posts here</small>
+            </div>
+          ) : (
+            <>
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`notification-item px-3 py-3 border-bottom ${
+                    !notification.is_read ? 'notification-unread' : ''
+                  }`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => !notification.is_read && handleMarkAsRead(notification.id, e)}
+                >
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div className="flex-grow-1">
+                      <div className="d-flex align-items-start mb-2">
+                        <i className={`bi ${getNotificationIcon(notification.type)} me-2`} 
+                           style={{ fontSize: '1.2rem' }}></i>
+                        <div className="flex-grow-1">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <strong className="small d-block">
+                              {getNotificationTitle(notification.type)}
+                            </strong>
+                            {!notification.is_read && (
+                              <Badge bg="primary" pill style={{ fontSize: '0.65rem' }}>
+                                New
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mb-1 small text-dark" style={{ lineHeight: '1.4' }}>
+                            {notification.message}
+                          </p>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <small className="text-muted">
+                              <i className="bi bi-clock me-1"></i>
+                              {formatTime(notification.created_at)}
+                            </small>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="text-danger p-0 ms-2"
+                              onClick={(e) => handleDelete(notification.id, e)}
+                              title="Delete notification"
+                            >
+                              <i className="bi bi-trash"></i>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="mb-1 small text-muted">{notification.message}</p>
-                    <small className="text-muted">{formatTime(notification.created_at)}</small>
                   </div>
-                  {!notification.is_read && (
-                    <Badge bg="primary" pill style={{ fontSize: '0.6rem' }}>New</Badge>
-                  )}
                 </div>
-              </Dropdown.Item>
-            ))}
-          </>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {notifications.length > 0 && (
+          <div className="text-center py-2 border-top bg-light">
+            <small className="text-muted">
+              <i className="bi bi-info-circle me-1"></i>
+              Click to mark as read • {unreadCount} unread
+            </small>
+          </div>
         )}
       </Dropdown.Menu>
+
+      {/* Custom Styles */}
+      <style>{`
+        .notification-bell-toggle {
+          transition: all 0.2s ease;
+        }
+        
+        .notification-bell-toggle:hover {
+          transform: scale(1.1);
+        }
+
+        .notification-badge {
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.1);
+          }
+        }
+
+        .notification-menu {
+          width: 380px !important;
+          border-radius: 12px;
+          border: none;
+        }
+
+        .notification-item {
+          transition: background-color 0.2s ease;
+        }
+
+        .notification-item:hover {
+          background-color: #f8f9fa;
+        }
+
+        .notification-unread {
+          background-color: #e3f2fd;
+        }
+
+        .notification-unread:hover {
+          background-color: #bbdefb;
+        }
+
+        @media (max-width: 576px) {
+          .notification-menu {
+            width: 320px !important;
+          }
+        }
+      `}</style>
     </Dropdown>
   );
 }

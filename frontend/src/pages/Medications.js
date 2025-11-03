@@ -25,10 +25,10 @@ function Medications() {
 
   useEffect(() => {
     fetchMedications();
-    requestNotificationPermission(); // ✅ Request permission on load
+    requestNotificationPermission(); 
   }, []);
 
-  // ✅ Request browser notification permission
+  // Request browser notification permission
   const requestNotificationPermission = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().then(permission => {
@@ -90,7 +90,7 @@ function Medications() {
     }
   };
 
-  // ✅ Open reminder settings modal
+  //  Open reminder settings modal
   const openReminderSettings = (med) => {
     setSelectedMed(med);
     setReminderForm({
@@ -100,7 +100,7 @@ function Medications() {
     setShowReminderModal(true);
   };
 
-  // ✅ Add reminder time
+  //  Add reminder time
   const addReminderTime = () => {
     if (!newReminderTime) {
       toast.error("Please select a time");
@@ -119,7 +119,7 @@ function Medications() {
     setNewReminderTime("");
   };
 
-  // ✅ Remove reminder time
+  // Remove reminder time
   const removeReminderTime = (time) => {
     setReminderForm({
       ...reminderForm,
@@ -127,7 +127,7 @@ function Medications() {
     });
   };
 
-  // ✅ Save reminder settings
+  // Save reminder settings
   const saveReminderSettings = async () => {
     try {
       await api.put(`/api/medications/${selectedMed.id}/reminders`, reminderForm);
@@ -165,7 +165,7 @@ function Medications() {
         </Button>
       </div>
 
-      {/* ✅ Notification permission alert */}
+      {/*  Notification permission alert */}
       {Notification.permission === "default" && (
         <Card className="mb-3 border-warning">
           <Card.Body>
@@ -301,7 +301,7 @@ function Medications() {
         </Form>
       </Modal>
 
-      {/* ✅ Reminder Settings Modal */}
+      {/*  Reminder Settings Modal */}
       <Modal show={showReminderModal} onHide={() => setShowReminderModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>

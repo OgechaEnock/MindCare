@@ -19,10 +19,10 @@ function Appointments() {
 
   useEffect(() => {
     fetchAppointments();
-    requestNotificationPermission(); // ✅ Request permission on load
+    requestNotificationPermission(); 
   }, []);
 
-  // ✅ Request browser notification permission
+  // Request browser notification permission
   const requestNotificationPermission = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().then(permission => {
@@ -108,7 +108,7 @@ function Appointments() {
         </Button>
       </div>
 
-      {/* ✅ Notification permission alert */}
+      {/* Notification permission alert */}
       {Notification.permission === "default" && (
         <Card className="mb-3 border-warning">
           <Card.Body>
@@ -231,7 +231,7 @@ function Appointments() {
               />
             </Form.Group>
 
-            {/* ✅ Reminder Options */}
+            {/* Reminder Options */}
             <Card className="mb-3 bg-light">
               <Card.Body>
                 <h6 className="mb-3">

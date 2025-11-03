@@ -66,7 +66,7 @@ export default function Forum() {
       const message = res.data.message;
 
       if (approvalStatus === 'approved') {
-        toast.success(message || '✅ Your post has been published!');
+        toast.success(message || ' Your post has been published!');
         setTitle('');
         setBody('');
         setCategory('general');
@@ -74,7 +74,7 @@ export default function Forum() {
         fetchThreads();
       } else if (approvalStatus === 'pending') {
         toast.warning(
-          message || '⏳ Your post is pending review. It will appear after moderator approval.',
+          message || ' Your post is pending review. It will appear after moderator approval.',
           { autoClose: 6000 }
         );
         setTitle('');
@@ -96,26 +96,26 @@ export default function Forum() {
         const message = errorData.message || '';
         
         toast.error(
-          `🚫 ${reason}${message ? ' - ' + message : ''}`,
+          ` ${reason}${message ? ' - ' + message : ''}`,
           { autoClose: 7000 }
         );
       } else if (err.response?.status === 429) {
         const retryAfter = err.response.data?.retryAfter || 2;
         toast.error(
-          `⏱️ Too many requests. Please wait ${retryAfter} seconds and try again.`,
+          `⏱Too many requests. Please wait ${retryAfter} seconds and try again.`,
           { autoClose: 5000 }
         );
       } else if (err.response?.status === 403) {
         const categories = err.response.data.categories || [];
         toast.error(
-          `🚫 Post rejected by moderation. ${
+          `Post rejected by moderation. ${
             categories.length > 0 ? `Flagged: ${categories.join(', ')}` : ''
           }`,
           { autoClose: 5000 }
         );
       } else if (err.response?.status === 503) {
         toast.error(
-          '⚠️ Moderation service unavailable. Please try again in a moment.',
+          ' Moderation service unavailable. Please try again in a moment.',
           { autoClose: 6000 }
         );
       } else if (err.response?.status === 401) {
@@ -138,19 +138,19 @@ export default function Forum() {
 
   const confirmDelete = async () => {
     try {
-      console.log(`🗑️ Deleting post ${deleteModal.postId}`);
+      console.log(` Deleting post ${deleteModal.postId}`);
       await api.delete(`/api/forum/threads/${deleteModal.postId}`);
-      toast.success('✅ Post deleted successfully');
+      toast.success(' Post deleted successfully');
       setDeleteModal({ show: false, postId: null, postTitle: '' });
       fetchThreads();
     } catch (err) {
       console.error("Delete error:", err);
       if (err.response?.status === 404) {
-        toast.error('❌ Post not found');
+        toast.error(' Post not found');
       } else if (err.response?.status === 403) {
-        toast.error('❌ You can only delete your own posts');
+        toast.error(' You can only delete your own posts');
       } else {
-        toast.error('❌ Failed to delete post');
+        toast.error(' Failed to delete post');
       }
     }
   };
@@ -253,8 +253,7 @@ export default function Forum() {
                         <i className="bi bi-clock me-1"></i>
                         {formatDate(thread.created_at)}
                       </div>
-                      
-                      {/* Delete button - only show for post author */}
+                      {/* Delete button  */}
                       {isAuthor(thread) && (
                         <Button 
                           variant="outline-danger" 

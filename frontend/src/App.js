@@ -14,7 +14,7 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
-import BottomBar from "./components/BottomBar"; // 👈 new small footer for auth pages
+import BottomBar from "./components/BottomBar"; 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -138,10 +138,10 @@ function Layout() {
         </Routes>
       </main>
 
-      {/* Footer (only when logged in) */}
+      {/* Footer  */}
       {user && !isAuthPage && <Footer />}
 
-      {/* BottomBar (only on login/register) */}
+      {/* BottomBar  */}
       {!user && isAuthPage && <BottomBar />}
     </div>
   );

@@ -1,70 +1,106 @@
-# Getting Started with Create React App
+# 🧠 Mental Health Support Application
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A comprehensive web-based application designed to support individuals experiencing mental health challenges through medication management, appointment scheduling, and peer support via a moderated community forum.
 
-## Available Scripts
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12+-blue.svg)](https://www.postgresql.org/)
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## 📋 Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [System Architecture](#system-architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Database Setup](#database-setup)
+- [Running the Application](#running-the-application)
+- [Project Structure](#project-structure)
+- [API Documentation](#api-documentation)
+- [Security Features](#security-features)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+- [Contact & Support](#contact--support)
+- [Project Status](#project-status)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🎯 Overview
 
-### `npm test`
+The **Mental Health Support Application** is a full-stack educational project developed as part of a software engineering course.  
+It focuses on **requirements engineering**, **project planning**, **system implementation**, and **testing**.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+This platform enables users to:
+- Maintain secure health and medical records  
+- Manage medications and appointments  
+- Interact safely with a moderated mental health support community  
+- Receive notifications and reminders  
 
-### `npm run build`
+> ⚠️ **Disclaimer:** This project is for **educational purposes only** and should not be used for clinical decision-making.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## ✨ Features
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 🔐 Authentication & Security
+- Secure registration & login using **JWT**
+- Password hashing with **bcrypt**
+- AES-256 encryption for sensitive data
+- Protected routes and middleware authorization
 
-### `npm run eject`
+### 🏥 Health Management
+- CRUD operations for medical history (diagnoses, allergies, conditions)
+- Manage medications with reminder schedules
+- Add, update, and cancel appointments
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 💬 Community Forum
+- Peer-to-peer discussion board
+- AI-powered moderation for user safety
+- Ability to post, comment, and delete discussions
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 🔔 Notifications
+- Real-time notifications for medications and appointments
+- In-app and push reminders
+- Notification center for viewing all alerts
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### 📊 Dashboard
+- Displays upcoming appointments
+- Medication schedules and reminder summaries
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+---
 
-## Learn More
+## 🛠️ Technology Stack
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+**Backend**
+- Node.js (v18+)
+- Express.js
+- PostgreSQL
+- JWT, bcrypt, AES encryption
+- node-cron for reminders
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+**Frontend**
+- React (v18.2)
+- React Router DOM
+- Bootstrap 5
+- React Toastify
+- Axios for API communication
 
-### Code Splitting
+**Testing**
+- Jest
+- Supertest
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+**Documentation & Planning**
+- StarUML (UML diagrams)
+- Microsoft Project (Gantt chart & schedule)
 
-### Analyzing the Bundle Size
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🏗️ System Architecture
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

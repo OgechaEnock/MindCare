@@ -113,7 +113,7 @@ psql --version  # v12+
 
 ##  Fork and Clone The Repository
 
-git clone https://github.com/yourusername/mental-health-app.git
+git clone [https:(https://github.com/OgechaEnock/MindCare)
 cd mental-health-app
 
 ##  Backend Setup

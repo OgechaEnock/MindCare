@@ -12,7 +12,7 @@ function BottomBar() {
       }}
     >
       <p style={{ margin: 0 }}>
-        © {new Date().getFullYear()} MindCare — Empowering mental wellness 🌿
+        © {new Date().getFullYear()} MindCare — Empowering mental wellness 
       </p>
     </footer>
   );

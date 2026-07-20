@@ -4,14 +4,14 @@ import { decrypt } from "../utils/encrypt.js";
 /**
  * Save notification to database for user to see in app
  */
-export const createNotification = async (userId, type, title, message, relatedId = null) => {
+export const createNotification = async (userId, type, message, relatedId = null) => {
   try {
     await pool.query(
-      `INSERT INTO notifications (user_id, notification_type, title, message, related_id, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [userId, type, title, message, relatedId]
+      `INSERT INTO notifications (user_id, type, message, related_id, created_at)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [userId, type, message, relatedId]
     );
-    console.log(`Notification created for user ${userId}: ${title}`);
+    console.log(`Notification created for user ${userId}: ${type}`);
   } catch (error) {
     console.error("Error creating notification:", error);
   }
@@ -81,8 +81,7 @@ export const checkMedicationReminders = async () => {
         
         await createNotification(
           med.user_id,
-          'medication',
-          ' Medication Reminder',
+          'medication_reminder',
           `Time to take ${medName} (${medDosage})`,
           med.id
         );
@@ -124,8 +123,7 @@ export const checkAppointmentReminders = async () => {
       
       await createNotification(
         apt.user_id,
-        'appointment',
-        ' Appointment Tomorrow',
+        'appointment_reminder',
         `${title} on ${dateStr} at ${apt.appointment_time}`,
         apt.id
       );
@@ -159,8 +157,7 @@ export const checkAppointmentReminders = async () => {
       
       await createNotification(
         apt.user_id,
-        'appointment',
-        'Appointment in 1 Hour',
+        'appointment_reminder',
         `${title} at ${apt.appointment_time}`,
         apt.id
       );

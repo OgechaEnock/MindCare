@@ -78,7 +78,7 @@ function Navigation() {
                 key={item.path}
                 as={Link} 
                 to={item.path}
-                className={`nav-link-custom d-flex align-items-center ${isActive(item.path) ? 'active' : ''}`}
+                className={`nav-link-custom d-flex align-items-center ${scrolled ? 'nav-link-dark' : 'nav-link-light'} ${isActive(item.path) ? 'active' : ''}`}
               >
                 <i className={`bi ${item.icon} me-2`}></i>
                 {item.label}
@@ -139,7 +139,6 @@ function Navigation() {
         </Navbar.Collapse>
       </Container>
 
-      {/* Custom Styles */}
       <style>{`
         .navbar-custom {
           padding: 1rem 0;
@@ -162,7 +161,6 @@ function Navigation() {
         }
 
         .nav-link-custom {
-          color: ${scrolled ? 'var(--mc-text-primary)' : 'rgba(255, 255, 255, 0.9)'} !important;
           padding: 0.6rem 1rem !important;
           margin: 0.2rem;
           border-radius: 8px;
@@ -172,14 +170,10 @@ function Navigation() {
         }
 
         .nav-link-custom:hover {
-          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
-          background-color: ${scrolled ? 'var(--mc-primary-50)' : 'rgba(255, 255, 255, 0.15)'};
           transform: translateY(-2px);
         }
 
         .nav-link-custom.active {
-          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
-          background-color: ${scrolled ? 'var(--mc-primary-100)' : 'rgba(255, 255, 255, 0.25)'};
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
@@ -191,7 +185,6 @@ function Navigation() {
           transform: translateX(-50%);
           width: 30px;
           height: 3px;
-          background: ${scrolled ? 'var(--mc-primary-600)' : 'white'};
           border-radius: 2px;
         }
 
@@ -225,6 +218,42 @@ function Navigation() {
           .nav-link-custom {
             margin: 0.3rem 0;
           }
+        }
+        
+        .nav-link-light {
+          color: rgba(255, 255, 255, 0.9) !important;
+        }
+        
+        .nav-link-light:hover {
+          color: white !important;
+          background-color: rgba(255, 255, 255, 0.15);
+        }
+        
+        .nav-link-light.active {
+          color: white !important;
+          background-color: rgba(255, 255, 255, 0.25);
+        }
+        
+        .nav-link-light.active::after {
+          background: white;
+        }
+        
+        .nav-link-dark {
+          color: var(--mc-text-primary) !important;
+        }
+        
+        .nav-link-dark:hover {
+          color: var(--mc-primary-600) !important;
+          background-color: var(--mc-primary-50);
+        }
+        
+        .nav-link-dark.active {
+          color: var(--mc-primary-600) !important;
+          background-color: var(--mc-primary-100);
+        }
+        
+        .nav-link-dark.active::after {
+          background: var(--mc-primary-600);
         }
       `}</style>
     </Navbar>

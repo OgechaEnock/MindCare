@@ -15,9 +15,9 @@ function Login() {
     e.preventDefault();
     setLoading(true);
 
-    const result = await login(email, password);
+    const result = await login({ email, password });
 
-    if (result.success) {
+    if (result) {
       navigate("/dashboard");
     }
 

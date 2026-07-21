@@ -14,10 +14,11 @@ function Register() {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    // Clear error for this field
     if (errors[e.target.name]) {
       setErrors({ ...errors, [e.target.name]: null });
     }
@@ -32,7 +33,7 @@ function Register() {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(form.email)) {
-      newErrors.email = "Please enter a valid email";
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (form.password.length < 8) {
@@ -66,122 +67,167 @@ function Register() {
   };
 
   return (
-    <Container 
-      className="d-flex justify-content-center align-items-center" 
-      style={{ minHeight: "100vh" }}
-    >
-      <Card className="p-4 shadow" style={{ width: "100%", maxWidth: "450px" }}>
-        <div className="text-center mb-4">
-          <i className="bi bi-person-plus-fill text-success" style={{ fontSize: "3rem" }}></i>
-          <h3 className="mt-3">Create Account</h3>
-          <p className="text-muted">Join our mental health support community</p>
-        </div>
+    <div className="mc-auth-page">
+      {/* Background decorative elements */}
+      <div className="mc-animated-bg">
+        <div className="mc-bg-blob mc-bg-blob-1"></div>
+        <div className="mc-bg-blob mc-bg-blob-2"></div>
+        <div className="mc-bg-blob mc-bg-blob-3"></div>
+      </div>
 
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-3" controlId="name">
-            <Form.Label>Full Name</Form.Label>
-            <Form.Control
-              name="name"
-              type="text"
-              placeholder="Enter your full name"
-              value={form.name}
-              onChange={handleChange}
-              required
-              isInvalid={!!errors.name}
-            />
-            <Form.Control.Feedback type="invalid">
-              {errors.name}
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="email">
-            <Form.Label>Email Address</Form.Label>
-            <Form.Control
-              name="email"
-              type="email"
-              placeholder="Enter your email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              isInvalid={!!errors.email}
-            />
-            <Form.Control.Feedback type="invalid">
-              {errors.email}
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="password">
-            <Form.Label>Password</Form.Label>
-            <Form.Control
-              name="password"
-              type="password"
-              placeholder="At least 8 characters"
-              value={form.password}
-              onChange={handleChange}
-              required
-              minLength={8}
-              isInvalid={!!errors.password}
-            />
-            <Form.Control.Feedback type="invalid">
-              {errors.password}
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3" controlId="confirmPassword">
-            <Form.Label>Confirm Password</Form.Label>
-            <Form.Control
-              name="confirmPassword"
-              type="password"
-              placeholder="Re-enter your password"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              required
-              isInvalid={!!errors.confirmPassword}
-            />
-            <Form.Control.Feedback type="invalid">
-              {errors.confirmPassword}
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="checkbox"
-              label={
-                <small>
-                  I understand this is an educational project and not for actual medical use
-                </small>
-              }
-              required
-            />
-          </Form.Group>
-
-          <Button 
-            variant="success" 
-            type="submit" 
-            className="w-100 mb-3"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                Creating account...
-              </>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
-
-          <div className="text-center">
-            <p className="mb-0">
-              Already have an account?{" "}
-              <Link to="/" className="text-decoration-none">
-                Login here
-              </Link>
-            </p>
+      <Container>
+        <Card className="mc-auth-card border-0">
+          <div className="mc-auth-card-header">
+            <div className="mc-auth-icon" style={{ color: 'var(--mc-success)' }}>
+              <i className="bi bi-person-plus-fill"></i>
+            </div>
+            <h3 className="mc-auth-title">Create Account</h3>
+            <p className="mc-auth-subtitle">Join our supportive community today</p>
           </div>
-        </Form>
-      </Card>
-    </Container>
+
+          <Form onSubmit={handleSubmit}>
+            <Form.Group className="mc-form-group" controlId="name">
+              <Form.Label className="mc-form-label">
+                <i className="bi bi-person me-2"></i>Full Name
+              </Form.Label>
+              <Form.Control
+                name="name"
+                type="text"
+                placeholder="Enter your full name"
+                value={form.name}
+                onChange={handleChange}
+                required
+                isInvalid={!!errors.name}
+                className="mc-form-control"
+              />
+              <Form.Control.Feedback type="invalid">
+                {errors.name}
+              </Form.Control.Feedback>
+            </Form.Group>
+
+            <Form.Group className="mc-form-group" controlId="email">
+              <Form.Label className="mc-form-label">
+                <i className="bi bi-envelope me-2"></i>Email Address
+              </Form.Label>
+              <Form.Control
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={handleChange}
+                required
+                isInvalid={!!errors.email}
+                className="mc-form-control"
+              />
+              <Form.Control.Feedback type="invalid">
+                {errors.email}
+              </Form.Control.Feedback>
+            </Form.Group>
+
+            <Form.Group className="mc-form-group" controlId="password">
+              <Form.Label className="mc-form-label">
+                <i className="bi bi-lock me-2"></i>Password
+              </Form.Label>
+              <div className="position-relative">
+                <Form.Control
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="At least 8 characters"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                  isInvalid={!!errors.password}
+                  className="mc-form-control pe-5"
+                />
+                <button
+                  type="button"
+                  className="mc-password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                </button>
+              </div>
+              <Form.Control.Feedback type="invalid">
+                {errors.password}
+              </Form.Control.Feedback>
+            </Form.Group>
+
+            <Form.Group className="mc-form-group" controlId="confirmPassword">
+              <Form.Label className="mc-form-label">
+                <i className="bi bi-lock-fill me-2"></i>Confirm Password
+              </Form.Label>
+              <div className="position-relative">
+                <Form.Control
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Re-enter your password"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  isInvalid={!!errors.confirmPassword}
+                  className="mc-form-control pe-5"
+                />
+                <button
+                  type="button"
+                  className="mc-password-toggle"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  tabIndex={-1}
+                >
+                  <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                </button>
+              </div>
+              <Form.Control.Feedback type="invalid">
+                {errors.confirmPassword}
+              </Form.Control.Feedback>
+            </Form.Group>
+
+            <Form.Group className="mb-4">
+              <Form.Check
+                type="checkbox"
+                id="terms-check"
+                label={
+                  <small>
+                    I understand this is an educational project and not for actual medical use
+                  </small>
+                }
+                required
+              />
+            </Form.Group>
+
+            <Button 
+              variant="success" 
+              type="submit" 
+              className="mc-btn-primary w-100 mb-3"
+              disabled={loading}
+              style={{ background: 'linear-gradient(135deg, var(--mc-success) 0%, var(--mc-secondary-600) 100%)' }}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-person-check me-2"></i>
+                  Create Account
+                </>
+              )}
+            </Button>
+
+            <div className="text-center">
+              <p className="mb-0 text-muted">
+                Already have an account?{" "}
+                <Link to="/" className="text-decoration-none fw-semibold" style={{ color: 'var(--mc-primary-600)' }}>
+                  Sign In
+                </Link>
+              </p>
+            </div>
+          </Form>
+        </Card>
+      </Container>
+    </div>
   );
 }
 

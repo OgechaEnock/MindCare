@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Card, ListGroup, Badge, Spinner, Alert, Button, ProgressBar } from "react-bootstrap";
+import { Container, Row, Col, Card, ListGroup, Badge, Spinner, Alert, ProgressBar } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -35,7 +35,6 @@ function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch all data in parallel
       const [medsRes, aptsRes, forumRes, historyRes] = await Promise.all([
         api.get("/api/medications"),
         api.get("/api/appointments"),
@@ -48,31 +47,18 @@ function Dashboard() {
       const forumPosts = forumRes.data;
       const medicalHistory = historyRes.data;
 
-      // Debug: Log appointment data to see the format
-      console.log('Appointments data:', appointments);
-      if (appointments.length > 0) {
-        console.log('Sample appointment:', appointments[0]);
-      }
-
-      // Filter appointments based on backend status field
       const upcomingApts = appointments.filter(apt => apt.status === 'Upcoming');
       
-      // Sort upcoming appointments by date and time
       const sortedUpcoming = upcomingApts.sort((a, b) => {
         const dateA = new Date(`${a.appointment_date}T${a.appointment_time}`);
         const dateB = new Date(`${b.appointment_date}T${b.appointment_time}`);
         return dateA - dateB;
       });
 
-      // Filter today's appointments from upcoming appointments
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-      
-      const todayApts = sortedUpcoming.filter(apt => 
-        apt.appointment_date === todayStr
-      );
+      const todayStr = today.toISOString().split('T')[0];
+      const todayApts = sortedUpcoming.filter(apt => apt.appointment_date === todayStr);
 
-      // Update stats - all based on backend data
       setStats({
         medications: medications.length,
         appointments: appointments.length,
@@ -95,46 +81,32 @@ function Dashboard() {
   };
 
   const formatDateTime = (date, time) => {
-    // Validate inputs
-    if (!date || !time) {
-      return 'Date not set';
-    }
+    if (!date || !time) return 'Date not set';
     
     try {
-      // Parse date parts
       let dateObj;
-      
-      // Handle different date formats
       if (date.includes('-')) {
-        // Format: YYYY-MM-DD or YYYY-M-D
         const [year, month, day] = date.split('-').map(Number);
         dateObj = new Date(year, month - 1, day);
       } else if (date.includes('/')) {
-        // Format: MM/DD/YYYY or M/D/YYYY
         dateObj = new Date(date);
       } else {
         dateObj = new Date(date);
       }
       
-      // Check if date is valid
-      if (isNaN(dateObj.getTime())) {
-        return `${date} at ${formatTime(time)}`;
-      }
+      if (isNaN(dateObj.getTime())) return `${date} at ${formatTime(time)}`;
       
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const aptDateOnly = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-      
-      // Parse time for full datetime comparison
+
       const timeParts = time.split(':').map(Number);
       const aptDateTime = new Date(dateObj);
       aptDateTime.setHours(timeParts[0] || 0, timeParts[1] || 0, timeParts[2] || 0);
-      
+
       const diffMs = aptDateTime - now;
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor((aptDateOnly - today) / (1000 * 60 * 60 * 24));
-      
-      // Format time nicely
       const timeStr = formatTime(time);
       
       if (diffHours < 1 && diffMs > 0) {
@@ -150,25 +122,18 @@ function Dashboard() {
         return `${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${timeStr}`;
       }
     } catch (error) {
-      console.error('Date formatting error:', error, { date, time });
       return `${date} at ${formatTime(time)}`;
     }
   };
 
   const formatTime = (time) => {
     if (!time) return 'Time not set';
-    
     try {
-      // Try to parse and format the time
       const timeParts = time.split(':');
       if (timeParts.length >= 2) {
         const hours = parseInt(timeParts[0]);
         const minutes = parseInt(timeParts[1]);
-        
-        if (isNaN(hours) || isNaN(minutes)) {
-          return time;
-        }
-        
+        if (isNaN(hours) || isNaN(minutes)) return time;
         const period = hours >= 12 ? 'PM' : 'AM';
         const displayHours = hours % 12 || 12;
         return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
@@ -211,39 +176,42 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <Container className="mt-4 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-2">Loading dashboard...</p>
+      <Container className="mt-4 text-center py-5">
+        <div className="mc-loading-content">
+          <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }} />
+          <p className="mt-3 text-muted">Loading your wellness dashboard...</p>
+        </div>
       </Container>
     );
   }
 
   const healthScore = getHealthScore();
+  const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <Container className="mt-4 mb-5">
       {/* Welcome Header */}
-      <div className="mb-4">
-        <h2>{greeting}, {user?.name || "User"}! 👋</h2>
-        <p className="text-muted">Here's your health overview for {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+      <div className="mc-section-title">
+        <h2 className="mb-0">{greeting}, {user?.name || "Friend"}! 👋</h2>
+        <p className="text-muted mb-0 mt-1">{todayDate}</p>
       </div>
 
       {/* Today's Appointments Alert */}
       {todayAppointments.length > 0 && (
-        <Alert variant="warning" className="mb-4 shadow-sm">
+        <Alert variant="warning" className="mb-4 shadow-sm border-0" style={{ borderRadius: 'var(--mc-radius-lg)' }}>
           <div className="d-flex align-items-center">
-            <i className="bi bi-bell-fill me-3" style={{ fontSize: "2rem" }}></i>
+            <i className="bi bi-bell-fill me-3" style={{ fontSize: "2rem", color: 'var(--mc-warning)' }}></i>
             <div className="flex-grow-1">
-              <Alert.Heading className="h6 mb-1">
+              <Alert.Heading className="h6 mb-1 fw-bold">
                 You have {todayAppointments.length} appointment{todayAppointments.length > 1 ? 's' : ''} today!
               </Alert.Heading>
               {todayAppointments.map(apt => (
-                <div key={apt.id} className="small">
+                <div key={apt.id} className="small mb-1">
                   <strong>{apt.title}</strong> at {formatTime(apt.appointment_time)}
                 </div>
               ))}
             </div>
-            <Link to="/appointments" className="btn btn-warning btn-sm">
+            <Link to="/appointments" className="btn btn-warning btn-sm rounded-pill px-3">
               View Details
             </Link>
           </div>
@@ -253,19 +221,19 @@ function Dashboard() {
       {/* Health Profile Score */}
       <Row className="mb-4">
         <Col>
-          <Card className="shadow-sm border-0 bg-gradient" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-            <Card.Body className="text-white">
+          <Card className="shadow-sm border-0 bg-white" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Body className="p-4">
               <Row className="align-items-center">
                 <Col md={8}>
-                  <h5 className="mb-2">
-                    <i className="bi bi-heart-pulse-fill me-2"></i>
+                  <h5 className="mb-2 fw-bold">
+                    <i className="bi bi-heart-pulse-fill me-2 text-primary"></i>
                     Health Profile Completion
                   </h5>
                   <ProgressBar 
                     now={healthScore} 
                     label={`${healthScore}%`} 
-                    className="mb-2"
-                    style={{ height: '25px', backgroundColor: 'rgba(255,255,255,0.3)' }}
+                    className="mb-2 mc-health-progress"
+                    style={{ height: '25px' }}
                   />
                   <p className="mb-0 small">
                     {healthScore === 100 
@@ -284,67 +252,75 @@ function Dashboard() {
         </Col>
       </Row>
 
-      {/* Quick Stats */}
-      <Row className="mb-4">
-        <Col md={3} sm={6} className="mb-3">
-          <Card className="shadow-sm border-0 h-100 hover-lift">
-            <Card.Body className="text-center">
+      {/* Quick Stats - Using custom styled cards */}
+      <Row className="mb-4 g-3">
+        <Col md={3} sm={6}>
+          <Card className="mc-stats-card h-100 border-0">
+            <Card.Body className="p-4">
               <div className="d-flex justify-content-between align-items-start mb-3">
-                <i className="bi bi-capsule display-4 text-primary"></i>
-                <Badge bg="primary" pill className="fs-6">{stats.medications}</Badge>
+                <div className="mc-stats-icon text-primary">
+                  <i className="bi bi-capsule"></i>
+                </div>
+                <Badge bg="primary" pill className="fs-5">{stats.medications}</Badge>
               </div>
-              <h5>Medications</h5>
-              <p className="text-muted small mb-2">Active prescriptions</p>
-              <Link to="/medications" className="btn btn-sm btn-outline-primary">
-                Manage
+              <h5 className="mc-stats-label mb-3">Medications</h5>
+              <p className="text-muted small mb-3">Active prescriptions</p>
+              <Link to="/medications" className="btn btn-sm btn-outline-primary w-100 rounded-pill">
+                <i className="bi bi-plus-circle me-1"></i> Manage
               </Link>
             </Card.Body>
           </Card>
         </Col>
 
-        <Col md={3} sm={6} className="mb-3">
-          <Card className="shadow-sm border-0 h-100 hover-lift">
-            <Card.Body className="text-center">
+        <Col md={3} sm={6}>
+          <Card className="mc-stats-card h-100 border-0">
+            <Card.Body className="p-4">
               <div className="d-flex justify-content-between align-items-start mb-3">
-                <i className="bi bi-calendar-event display-4 text-success"></i>
-                <Badge bg="success" pill className="fs-6">{stats.upcomingAppointments}</Badge>
+                <div className="mc-stats-icon text-success">
+                  <i className="bi bi-calendar-event"></i>
+                </div>
+                <Badge bg="success" pill className="fs-5">{stats.upcomingAppointments}</Badge>
               </div>
-              <h5>Upcoming</h5>
-              <p className="text-muted small mb-2">Scheduled appointments</p>
-              <Link to="/appointments" className="btn btn-sm btn-outline-success">
-                View
+              <h5 className="mc-stats-label mb-3">Upcoming</h5>
+              <p className="text-muted small mb-3">Scheduled appointments</p>
+              <Link to="/appointments" className="btn btn-sm btn-outline-success w-100 rounded-pill">
+                <i className="bi bi-eye me-1"></i> View
               </Link>
             </Card.Body>
           </Card>
         </Col>
 
-        <Col md={3} sm={6} className="mb-3">
-          <Card className="shadow-sm border-0 h-100 hover-lift">
-            <Card.Body className="text-center">
+        <Col md={3} sm={6}>
+          <Card className="mc-stats-card h-100 border-0">
+            <Card.Body className="p-4">
               <div className="d-flex justify-content-between align-items-start mb-3">
-                <i className="bi bi-clipboard2-pulse display-4 text-warning"></i>
-                <Badge bg="warning" text="dark" pill className="fs-6">{stats.medicalHistoryEntries}</Badge>
+                <div className="mc-stats-icon" style={{ color: 'var(--mc-warning)' }}>
+                  <i className="bi bi-clipboard2-pulse"></i>
+                </div>
+                <Badge bg="warning" text="dark" pill className="fs-5">{stats.medicalHistoryEntries}</Badge>
               </div>
-              <h5>Medical History</h5>
-              <p className="text-muted small mb-2">Recorded entries</p>
-              <Link to="/profile" className="btn btn-sm btn-outline-warning">
-                Update
+              <h5 className="mc-stats-label mb-3">Medical History</h5>
+              <p className="text-muted small mb-3">Recorded entries</p>
+              <Link to="/profile" className="btn btn-sm btn-outline-warning w-100 rounded-pill">
+                <i className="bi bi-pencil me-1"></i> Update
               </Link>
             </Card.Body>
           </Card>
         </Col>
 
-        <Col md={3} sm={6} className="mb-3">
-          <Card className="shadow-sm border-0 h-100 hover-lift">
-            <Card.Body className="text-center">
+        <Col md={3} sm={6}>
+          <Card className="mc-stats-card h-100 border-0">
+            <Card.Body className="p-4">
               <div className="d-flex justify-content-between align-items-start mb-3">
-                <i className="bi bi-chat-dots display-4 text-info"></i>
-                <Badge bg="info" pill className="fs-6">{stats.forumPosts}</Badge>
+                <div className="mc-stats-icon text-info">
+                  <i className="bi bi-chat-dots"></i>
+                </div>
+                <Badge bg="info" pill className="fs-5">{stats.forumPosts}</Badge>
               </div>
-              <h5>Forum</h5>
-              <p className="text-muted small mb-2">Community posts</p>
-              <Link to="/forum" className="btn btn-sm btn-outline-info">
-                Browse
+              <h5 className="mc-stats-label mb-3">Forum</h5>
+              <p className="text-muted small mb-3">Community posts</p>
+              <Link to="/forum" className="btn btn-sm btn-outline-info w-100 rounded-pill">
+                <i className="bi bi-chat me-1"></i> Browse
               </Link>
             </Card.Body>
           </Card>
@@ -354,14 +330,14 @@ function Dashboard() {
       <Row>
         {/* Recent Medications */}
         <Col lg={6} className="mb-4">
-          <Card className="shadow-sm border-0 h-100">
-            <Card.Header className="bg-white border-bottom">
+          <Card className="shadow-sm border-0 h-100 mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Header className="bg-white border-bottom py-3">
               <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">
+                <h5 className="mb-0 fw-bold">
                   <i className="bi bi-capsule me-2 text-primary"></i>
                   Active Medications
                 </h5>
-                <Link to="/medications" className="btn btn-sm btn-primary">
+                <Link to="/medications" className="btn btn-sm btn-primary rounded-pill px-3">
                   <i className="bi bi-plus-circle me-1"></i>
                   Add
                 </Link>
@@ -369,10 +345,11 @@ function Dashboard() {
             </Card.Header>
             <Card.Body style={{ maxHeight: '350px', overflowY: 'auto' }}>
               {recentMedications.length === 0 ? (
-                <div className="text-center py-4">
-                  <i className="bi bi-capsule text-muted" style={{ fontSize: "2.5rem" }}></i>
-                  <p className="text-muted mt-2 mb-0">No medications added yet</p>
-                  <Link to="/medications" className="btn btn-sm btn-primary mt-2">
+                <div className="mc-empty-state">
+                  <i className="bi bi-capsule mc-empty-icon"></i>
+                  <h5 className="mc-empty-title">No medications added yet</h5>
+                  <p className="mc-empty-text">Start tracking your prescriptions</p>
+                  <Link to="/medications" className="btn btn-sm btn-primary rounded-pill">
                     <i className="bi bi-plus-circle me-1"></i>
                     Add First Medication
                   </Link>
@@ -380,7 +357,7 @@ function Dashboard() {
               ) : (
                 <ListGroup variant="flush">
                   {recentMedications.map((med) => (
-                    <ListGroup.Item key={med.id} className="px-0 border-bottom">
+                    <ListGroup.Item key={med.id} className="px-0 border-bottom py-3">
                       <div className="d-flex justify-content-between align-items-start">
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-1">
@@ -396,9 +373,7 @@ function Dashboard() {
                             {med.frequency}
                           </small>
                         </div>
-                        <Badge bg="success" className="ms-2">
-                          Active
-                        </Badge>
+                        <Badge bg="success" className="ms-2 rounded-pill">Active</Badge>
                       </div>
                     </ListGroup.Item>
                   ))}
@@ -410,14 +385,14 @@ function Dashboard() {
 
         {/* Upcoming Appointments */}
         <Col lg={6} className="mb-4">
-          <Card className="shadow-sm border-0 h-100">
-            <Card.Header className="bg-white border-bottom">
+          <Card className="shadow-sm border-0 h-100 mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Header className="bg-white border-bottom py-3">
               <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">
+                <h5 className="mb-0 fw-bold">
                   <i className="bi bi-calendar-event me-2 text-success"></i>
                   Next Appointments
                 </h5>
-                <Link to="/appointments" className="btn btn-sm btn-success">
+                <Link to="/appointments" className="btn btn-sm btn-success rounded-pill px-3">
                   <i className="bi bi-plus-circle me-1"></i>
                   Schedule
                 </Link>
@@ -425,10 +400,11 @@ function Dashboard() {
             </Card.Header>
             <Card.Body style={{ maxHeight: '350px', overflowY: 'auto' }}>
               {upcomingAppointments.length === 0 ? (
-                <div className="text-center py-4">
-                  <i className="bi bi-calendar-x text-muted" style={{ fontSize: "2.5rem" }}></i>
-                  <p className="text-muted mt-2 mb-0">No upcoming appointments</p>
-                  <Link to="/appointments" className="btn btn-sm btn-success mt-2">
+                <div className="mc-empty-state">
+                  <i className="bi bi-calendar-x mc-empty-icon"></i>
+                  <h5 className="mc-empty-title">No upcoming appointments</h5>
+                  <p className="mc-empty-text">Schedule your next visit</p>
+                  <Link to="/appointments" className="btn btn-sm btn-success rounded-pill">
                     <i className="bi bi-calendar-plus me-1"></i>
                     Schedule Appointment
                   </Link>
@@ -436,7 +412,7 @@ function Dashboard() {
               ) : (
                 <ListGroup variant="flush">
                   {upcomingAppointments.map((apt) => (
-                    <ListGroup.Item key={apt.id} className="px-0 border-bottom">
+                    <ListGroup.Item key={apt.id} className="px-0 border-bottom py-3">
                       <div className="d-flex justify-content-between align-items-start">
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-1">
@@ -451,7 +427,7 @@ function Dashboard() {
                         <Badge 
                           bg={isToday(apt.appointment_date) ? 'danger' : 'warning'} 
                           text={isToday(apt.appointment_date) ? 'white' : 'dark'}
-                          className="ms-2"
+                          className="ms-2 rounded-pill"
                         >
                           {isToday(apt.appointment_date) ? 'Today' : 'Upcoming'}
                         </Badge>
@@ -468,14 +444,14 @@ function Dashboard() {
       <Row>
         {/* Latest Medical History */}
         <Col lg={6} className="mb-4">
-          <Card className="shadow-sm border-0 h-100">
-            <Card.Header className="bg-white border-bottom">
+          <Card className="shadow-sm border-0 h-100 mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Header className="bg-white border-bottom py-3">
               <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">
-                  <i className="bi bi-clipboard2-pulse me-2 text-warning"></i>
+                <h5 className="mb-0 fw-bold">
+                  <i className="bi bi-clipboard2-pulse me-2" style={{ color: 'var(--mc-warning)' }}></i>
                   Latest Medical History
                 </h5>
-                <Link to="/profile" className="btn btn-sm btn-warning">
+                <Link to="/profile" className="btn btn-sm btn-warning rounded-pill px-3">
                   <i className="bi bi-pencil me-1"></i>
                   Update
                 </Link>
@@ -483,10 +459,11 @@ function Dashboard() {
             </Card.Header>
             <Card.Body>
               {!latestMedicalHistory ? (
-                <div className="text-center py-4">
-                  <i className="bi bi-clipboard2-pulse text-muted" style={{ fontSize: "2.5rem" }}></i>
-                  <p className="text-muted mt-2 mb-0">No medical history recorded</p>
-                  <Link to="/profile" className="btn btn-sm btn-warning mt-2">
+                <div className="mc-empty-state">
+                  <i className="bi bi-clipboard2-pulse mc-empty-icon"></i>
+                  <h5 className="mc-empty-title">No medical history recorded</h5>
+                  <p className="mc-empty-text">Add your health information</p>
+                  <Link to="/profile" className="btn btn-sm btn-warning rounded-pill">
                     <i className="bi bi-plus-circle me-1"></i>
                     Add Medical History
                   </Link>
@@ -525,12 +502,12 @@ function Dashboard() {
                   
                   <div className="mb-3">
                     <small className="text-muted d-block mb-1">
-                      <i className="bi bi-exclamation-triangle me-1 text-danger"></i>
+                      <i className="bi bi-exclamation-triangle me-1" style={{ color: 'var(--mc-danger)' }}></i>
                       Allergies
                     </small>
                     <p className="mb-0">
                       {latestMedicalHistory.allergies ? (
-                        <strong className="text-danger">{latestMedicalHistory.allergies}</strong>
+                        <span className="text-danger fw-bold">{latestMedicalHistory.allergies}</span>
                       ) : (
                         <span className="text-muted fst-italic">None reported</span>
                       )}
@@ -551,14 +528,14 @@ function Dashboard() {
 
         {/* Community Forum Activity */}
         <Col lg={6} className="mb-4">
-          <Card className="shadow-sm border-0 h-100">
-            <Card.Header className="bg-white border-bottom">
+          <Card className="shadow-sm border-0 h-100 mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Header className="bg-white border-bottom py-3">
               <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">
+                <h5 className="mb-0 fw-bold">
                   <i className="bi bi-chat-dots me-2 text-info"></i>
                   Community Forum
                 </h5>
-                <Link to="/forum" className="btn btn-sm btn-info">
+                <Link to="/forum" className="btn btn-sm btn-info rounded-pill px-3">
                   <i className="bi bi-plus-circle me-1"></i>
                   Post
                 </Link>
@@ -566,10 +543,11 @@ function Dashboard() {
             </Card.Header>
             <Card.Body style={{ maxHeight: '350px', overflowY: 'auto' }}>
               {recentForumPosts.length === 0 ? (
-                <div className="text-center py-4">
-                  <i className="bi bi-chat-square-text text-muted" style={{ fontSize: "2.5rem" }}></i>
-                  <p className="text-muted mt-2 mb-0">No forum posts yet</p>
-                  <Link to="/forum" className="btn btn-sm btn-info mt-2">
+                <div className="mc-empty-state">
+                  <i className="bi bi-chat-square-text mc-empty-icon"></i>
+                  <h5 className="mc-empty-title">No forum posts yet</h5>
+                  <p className="mc-empty-text">Join the conversation</p>
+                  <Link to="/forum" className="btn btn-sm btn-info rounded-pill">
                     <i className="bi bi-chat-left-text me-1"></i>
                     Join Community
                   </Link>
@@ -577,13 +555,13 @@ function Dashboard() {
               ) : (
                 <ListGroup variant="flush">
                   {recentForumPosts.map((post) => (
-                    <ListGroup.Item key={post.id} className="px-0 border-bottom">
+                    <ListGroup.Item key={post.id} className="px-0 border-bottom py-3">
                       <div>
                         <div className="d-flex justify-content-between align-items-start mb-1">
                           <strong className="text-truncate" style={{ maxWidth: '80%' }}>
                             {post.title || "Forum Post"}
                           </strong>
-                          <Badge bg="success">
+                          <Badge bg="success" className="ms-2 rounded-pill">
                             <i className="bi bi-check-circle me-1"></i>
                             Approved
                           </Badge>
@@ -607,20 +585,6 @@ function Dashboard() {
           </Card>
         </Col>
       </Row>
-
-      
-    
-
-      {/* Custom CSS for hover effects */}
-      <style>{`
-        .hover-lift {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .hover-lift:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-        }
-      `}</style>
     </Container>
   );
 }

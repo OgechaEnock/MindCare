@@ -3,7 +3,6 @@ import { Dropdown, Badge, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { 
   getNotifications, 
-  getUnreadCount, 
   markNotificationAsRead, 
   markAllNotificationsAsRead,
   deleteNotification 
@@ -39,19 +38,7 @@ function NotificationBell() {
       setNotifications(data);
       
       const unread = data.filter(n => !n.is_read).length;
-      const previousUnread = unreadCount;
       setUnreadCount(unread);
-
-      // Show browser notification only for NEW unread notifications
-      if (unread > previousUnread && unread > 0 && Notification.permission === "granted") {
-        const latestUnread = data.find(n => !n.is_read);
-        if (latestUnread) {
-          showBrowserNotification(
-            getNotificationTitle(latestUnread.type),
-            latestUnread.message
-          );
-        }
-      }
     } catch (err) {
       console.error('Fetch notifications error:', err);
     }
@@ -61,8 +48,8 @@ function NotificationBell() {
     const titles = {
       'appointment_created': '📅 New Appointment',
       'appointment_updated': '📝 Appointment Updated',
-      'appointment_cancelled': ' Appointment Cancelled',
-      'forum_post_published': ' Post Published',
+      'appointment_cancelled': '❌ Appointment Cancelled',
+      'forum_post_published': '✅ Post Published',
       'forum_post_pending': '⏳ Post Pending Review',
       'forum_post_deleted': '🗑️ Post Deleted',
       'medication_reminder': '💊 Medication Reminder'
@@ -81,22 +68,6 @@ function NotificationBell() {
       'medication_reminder': 'bi-capsule text-primary'
     };
     return icons[type] || 'bi-bell text-secondary';
-  };
-
-  const showBrowserNotification = (title, body) => {
-    if ('Notification' in window && Notification.permission === "granted") {
-      try {
-        new Notification(title, {
-          body: body,
-          icon: '/logo192.png',
-          badge: '/logo192.png',
-          tag: 'mindcare-notification',
-          requireInteraction: false
-        });
-      } catch (error) {
-        console.error('Failed to show browser notification:', error);
-      }
-    }
   };
 
   const handleMarkAsRead = async (id, e) => {
@@ -301,7 +272,7 @@ function NotificationBell() {
 
         .notification-menu {
           width: 380px !important;
-          border-radius: 12px;
+          border-radius: var(--mc-radius-lg) !important;
           border: none;
         }
 

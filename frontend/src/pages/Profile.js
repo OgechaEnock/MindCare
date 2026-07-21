@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Container, Card, Form, Button, Row, Col, Spinner, Modal, ListGroup, Badge, Accordion } from "react-bootstrap";
+import { Container, Card, Form, Button, Row, Col, Spinner, Modal, Badge, Accordion } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -36,7 +36,6 @@ function Profile() {
 
   const handleOpenModal = (history = null) => {
     if (history) {
-      // Edit existing
       setEditingId(history.id);
       setForm({
         diagnosis: history.diagnosis,
@@ -45,7 +44,6 @@ function Profile() {
         notes: history.notes
       });
     } else {
-      // Add new
       setEditingId(null);
       setForm({
         diagnosis: "",
@@ -71,7 +69,6 @@ function Profile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate at least one field
     if (!form.diagnosis && !form.conditions && !form.allergies && !form.notes) {
       toast.error("Please fill at least one field");
       return;
@@ -81,11 +78,9 @@ function Profile() {
 
     try {
       if (editingId) {
-        // Update existing
         await api.put(`/api/profile/medical-history/${editingId}`, form);
         toast.success("Medical history updated successfully");
       } else {
-        // Add new
         await api.post("/api/profile/medical-history", form);
         toast.success("Medical history added successfully");
       }
@@ -134,50 +129,53 @@ function Profile() {
 
   if (loading) {
     return (
-      <Container className="mt-4 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-2">Loading profile...</p>
+      <Container className="mt-4 text-center py-5">
+        <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }} />
+        <p className="mt-3 text-muted">Loading profile...</p>
       </Container>
     );
   }
 
   return (
-    <Container className="mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2>
-            <i className="bi bi-person-circle me-2"></i>
-            Profile & Medical History
-          </h2>
-          <p className="text-muted">Manage your personal health information</p>
-        </div>
-        <Button variant="primary" onClick={() => handleOpenModal()}>
-          <i className="bi bi-plus-circle me-2"></i>
-          Add Medical History
-        </Button>
+    <Container className="mt-4 mb-5">
+      {/* Page Header */}
+      <div className="mc-section-title">
+        <h2 className="mb-0">
+          <i className="bi bi-person-circle me-2 text-primary"></i>
+          Profile & Medical History
+        </h2>
+        <p className="text-muted mb-0 mt-1">Manage your personal health information</p>
       </div>
 
       <Row>
         {/* User Profile Card */}
-        <Col md={4}>
-          <Card className="mb-4 shadow-sm">
-            <Card.Body className="text-center">
-              <i className="bi bi-person-circle text-primary" style={{ fontSize: "5rem" }}></i>
-              <h4 className="mt-3">{user?.name}</h4>
-              <p className="text-muted">{user?.email}</p>
-              <hr />
+        <Col md={4} className="mb-4">
+          <Card className="mb-4 border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Body className="text-center p-4">
+              <div className="mb-3">
+                <i className="bi bi-person-circle text-primary" style={{ fontSize: "5rem", opacity: 0.3 }}></i>
+                <div 
+                  className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                  style={{ width: '80px', height: '80px', fontSize: '2rem' }}
+                >
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <h4 className="mt-2 mb-1 fw-bold">{user?.name}</h4>
+                <p className="text-muted mb-0">{user?.email}</p>
+              </div>
+              <hr className="my-4" />
               <div className="text-start">
-                <p className="mb-2">
-                  <i className="bi bi-shield-lock me-2 text-success"></i>
-                  <small>All data is encrypted</small>
+                <p className="mb-3">
+                  <i className="bi bi-shield-lock text-success me-2 fs-5"></i>
+                  <span>All data is encrypted</span>
                 </p>
-                <p className="mb-2">
-                  <i className="bi bi-calendar me-2 text-info"></i>
-                  <small>Member since {new Date().getFullYear()}</small>
+                <p className="mb-3">
+                  <i className="bi bi-calendar text-info me-2 fs-5"></i>
+                  <span>Member since {new Date().getFullYear()}</span>
                 </p>
                 <p className="mb-0">
-                  <i className="bi bi-clipboard2-pulse me-2 text-warning"></i>
-                  <small>{histories.length} medical {histories.length === 1 ? 'entry' : 'entries'}</small>
+                  <i className="bi bi-clipboard2-pulse text-warning me-2 fs-5"></i>
+                  <span>{histories.length} medical {histories.length === 1 ? 'entry' : 'entries'}</span>
                 </p>
               </div>
             </Card.Body>
@@ -185,48 +183,50 @@ function Profile() {
 
           {/* Latest Medical History Summary */}
           {histories.length > 0 && (
-            <Card className="mb-4 border-info shadow-sm">
-              <Card.Header className="bg-info text-white">
-                <h6 className="mb-0">
+            <Card className="border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+              <Card.Header className="border-0 py-3" style={{ 
+                background: 'linear-gradient(135deg, var(--mc-warning) 0%, var(--mc-accent-500) 100%)'
+              }}>
+                <h6 className="mb-0 text-white fw-bold">
                   <i className="bi bi-clipboard2-pulse me-2"></i>
                   Latest Medical History
                 </h6>
               </Card.Header>
-              <Card.Body>
+              <Card.Body className="p-4">
                 <div className="mb-3">
                   <small className="text-muted d-block mb-1">Diagnosis</small>
-                  <p className="mb-0">
+                  <p className="mb-0 small">
                     {histories[0].diagnosis ? (
-                      <small>{histories[0].diagnosis.substring(0, 100)}{histories[0].diagnosis.length > 100 ? "..." : ""}</small>
+                      histories[0].diagnosis.substring(0, 100) + (histories[0].diagnosis.length > 100 ? "..." : "")
                     ) : (
-                      <small className="text-muted fst-italic">Not provided</small>
+                      <span className="text-muted fst-italic">Not provided</span>
                     )}
                   </p>
                 </div>
                 
                 <div className="mb-3">
                   <small className="text-muted d-block mb-1">Conditions</small>
-                  <p className="mb-0">
+                  <p className="mb-0 small">
                     {histories[0].conditions ? (
-                      <small>{histories[0].conditions.substring(0, 100)}{histories[0].conditions.length > 100 ? "..." : ""}</small>
+                      histories[0].conditions.substring(0, 100) + (histories[0].conditions.length > 100 ? "..." : "")
                     ) : (
-                      <small className="text-muted fst-italic">Not provided</small>
+                      <span className="text-muted fst-italic">Not provided</span>
                     )}
                   </p>
                 </div>
                 
                 <div className="mb-3">
                   <small className="text-muted d-block mb-1">Allergies</small>
-                  <p className="mb-0">
+                  <p className="mb-0 small">
                     {histories[0].allergies ? (
-                      <small className="text-danger fw-bold">{histories[0].allergies}</small>
+                      <span className="text-danger fw-bold">{histories[0].allergies}</span>
                     ) : (
-                      <small className="text-muted fst-italic">None reported</small>
+                      <span className="text-muted fst-italic">None reported</span>
                     )}
                   </p>
                 </div>
 
-                <div className="text-center mt-3 pt-3 border-top">
+                <div className="text-center pt-3 border-top">
                   <small className="text-muted">
                     <i className="bi bi-clock-history me-1"></i>
                     {formatDate(histories[0].created_at)}
@@ -239,39 +239,52 @@ function Profile() {
 
         {/* Medical History Timeline */}
         <Col md={8}>
-          <Card className="shadow-sm">
-            <Card.Header className="bg-white border-bottom">
-              <h5 className="mb-0">
-                <i className="bi bi-clock-history me-2"></i>
+          <Card className="border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card.Header className="bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+              <h5 className="mb-0 fw-bold">
+                <i className="bi bi-clock-history me-2 text-primary"></i>
                 Medical History Timeline
               </h5>
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={() => handleOpenModal()}
+                className="rounded-pill px-3"
+              >
+                <i className="bi bi-plus-circle me-1"></i>
+                Add Entry
+              </Button>
             </Card.Header>
-            <Card.Body>
+            <Card.Body className="p-4">
               {histories.length === 0 ? (
-                <div className="text-center py-5">
-                  <i className="bi bi-clipboard2-pulse text-muted" style={{ fontSize: "3rem" }}></i>
-                  <h5 className="mt-3">No medical history yet</h5>
-                  <p className="text-muted">Start tracking your medical information</p>
-                  <Button variant="primary" onClick={() => handleOpenModal()}>
-                    <i className="bi bi-plus-circle me-2"></i>
+                <div className="mc-empty-state">
+                  <i className="bi bi-clipboard2-pulse mc-empty-icon"></i>
+                  <h5 className="mc-empty-title">No medical history yet</h5>
+                  <p className="mc-empty-text">Start tracking your medical information</p>
+                  <Button 
+                    variant="primary" 
+                    onClick={() => handleOpenModal()}
+                    className="rounded-pill px-4"
+                  >
+                    <i className="bi bi-plus-circle me-1"></i>
                     Add First Entry
                   </Button>
                 </div>
               ) : (
                 <Accordion defaultActiveKey="0">
                   {histories.map((history, index) => (
-                    <Accordion.Item eventKey={index.toString()} key={history.id}>
-                      <Accordion.Header>
+                    <Accordion.Item eventKey={index.toString()} key={history.id} className="mb-3 border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-lg)' }}>
+                      <Accordion.Header className="rounded-3">
                         <div className="d-flex justify-content-between align-items-center w-100 me-3">
                           <div>
                             <strong>Entry #{histories.length - index}</strong>
-                            <small className="text-muted ms-3">
+                            <small className="text-muted ms-3 d-block d-md-inline">
                               <i className="bi bi-calendar me-1"></i>
                               {formatDate(history.created_at)}
                             </small>
                           </div>
                           {index === 0 && (
-                            <Badge bg="success" className="ms-2">Latest</Badge>
+                            <Badge bg="success" className="ms-2 rounded-pill">Latest</Badge>
                           )}
                         </div>
                       </Accordion.Header>
@@ -298,7 +311,7 @@ function Profile() {
 
                         <div className="mb-3">
                           <strong className="d-block mb-2">
-                            <i className="bi bi-exclamation-triangle me-2 text-danger"></i>
+                            <i className="bi bi-exclamation-triangle me-2" style={{ color: 'var(--mc-danger)' }}></i>
                             Allergies:
                           </strong>
                           <p className="ms-4 mb-0">
@@ -320,7 +333,7 @@ function Profile() {
                           </p>
                         </div>
 
-                        <hr />
+                        <hr className="my-4" />
 
                         <div className="d-flex justify-content-between align-items-center">
                           <small className="text-muted">
@@ -331,7 +344,7 @@ function Profile() {
                             <Button
                               variant="outline-primary"
                               size="sm"
-                              className="me-2"
+                              className="me-2 rounded-pill"
                               onClick={() => handleOpenModal(history)}
                             >
                               <i className="bi bi-pencil me-1"></i>
@@ -340,6 +353,7 @@ function Profile() {
                             <Button
                               variant="outline-danger"
                               size="sm"
+                              className="rounded-pill"
                               onClick={() => handleDelete(history.id)}
                             >
                               <i className="bi bi-trash me-1"></i>
@@ -358,25 +372,24 @@ function Profile() {
       </Row>
 
       {/* Add/Edit Modal */}
-      <Modal show={showModal} onHide={handleCloseModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-clipboard2-pulse me-2"></i>
+      <Modal show={showModal} onHide={handleCloseModal} size="lg" centered>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">
+            <i className="bi bi-clipboard2-pulse me-2 text-primary"></i>
             {editingId ? "Edit Medical History" : "Add Medical History"}
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
-          <Modal.Body>
-            <div className="alert alert-info small mb-4">
+          <Modal.Body className="pt-3">
+            <div className="alert alert-info small mb-4 rounded-3">
               <i className="bi bi-info-circle me-2"></i>
-              This information is encrypted and only visible to you. 
+              This information is encrypted and only visible to you.
               Fill in any fields that are relevant to your current health status.
             </div>
 
             <Form.Group className="mb-3">
-              <Form.Label>
-                <i className="bi bi-clipboard-pulse me-2"></i>
-                Diagnosis
+              <Form.Label className="fw-medium">
+                <i className="bi bi-clipboard-pulse me-2"></i>Diagnosis
               </Form.Label>
               <Form.Control
                 as="textarea"
@@ -385,13 +398,13 @@ function Profile() {
                 placeholder="Enter any diagnoses..."
                 value={form.diagnosis}
                 onChange={handleChange}
+                className="rounded-3"
               />
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>
-                <i className="bi bi-heart-pulse me-2"></i>
-                Medical Conditions
+              <Form.Label className="fw-medium">
+                <i className="bi bi-heart-pulse me-2"></i>Medical Conditions
               </Form.Label>
               <Form.Control
                 as="textarea"
@@ -400,13 +413,13 @@ function Profile() {
                 placeholder="List any ongoing medical conditions..."
                 value={form.conditions}
                 onChange={handleChange}
+                className="rounded-3"
               />
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>
-                <i className="bi bi-exclamation-triangle me-2 text-danger"></i>
-                Allergies
+              <Form.Label className="fw-medium">
+                <i className="bi bi-exclamation-triangle me-2" style={{ color: 'var(--mc-danger)' }}></i>Allergies
               </Form.Label>
               <Form.Control
                 as="textarea"
@@ -415,6 +428,7 @@ function Profile() {
                 placeholder="List any allergies (very important!)..."
                 value={form.allergies}
                 onChange={handleChange}
+                className="rounded-3"
               />
               <Form.Text className="text-danger">
                 <i className="bi bi-info-circle me-1"></i>
@@ -423,9 +437,8 @@ function Profile() {
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>
-                <i className="bi bi-journal-text me-2"></i>
-                Additional Notes
+              <Form.Label className="fw-medium">
+                <i className="bi bi-journal-text me-2"></i>Additional Notes
               </Form.Label>
               <Form.Control
                 as="textarea"
@@ -434,14 +447,25 @@ function Profile() {
                 placeholder="Any additional medical notes, symptoms, or observations..."
                 value={form.notes}
                 onChange={handleChange}
+                className="rounded-3"
               />
             </Form.Group>
           </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
+          <Modal.Footer className="border-0 pt-0">
+            <Button 
+              variant="outline-secondary" 
+              onClick={handleCloseModal} 
+              disabled={saving}
+              className="rounded-pill px-4"
+            >
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={saving}>
+            <Button 
+              variant="primary" 
+              type="submit" 
+              disabled={saving}
+              className="rounded-pill px-4"
+            >
               {saving ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2"></span>

@@ -26,15 +26,11 @@ import Profile from "./pages/Profile";
 // Loading Screen
 function LoadingScreen() {
   return (
-    <div
-      className="d-flex justify-content-center align-items-center"
-      style={{ minHeight: "100vh" }}
-    >
-      <div className="text-center">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <p className="mt-2">Loading...</p>
+    <div className="mc-loading-screen">
+      <div className="mc-loading-content">
+        <i className="bi bi-brain mc-loading-logo"></i>
+        <div className="mc-loading-spinner"></div>
+        <p className="mc-loading-text">Loading...</p>
       </div>
     </div>
   );
@@ -138,10 +134,10 @@ function Layout() {
         </Routes>
       </main>
 
-      {/* Footer  */}
+      {/* Footer */}
       {user && !isAuthPage && <Footer />}
 
-      {/* BottomBar  */}
+      {/* BottomBar */}
       {!user && isAuthPage && <BottomBar />}
     </div>
   );
@@ -163,6 +159,7 @@ function AppRoutes() {
         draggable
         pauseOnHover
         theme="colored"
+        className="rounded"
       />
     </BrowserRouter>
   );

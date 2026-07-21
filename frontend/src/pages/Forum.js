@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner } from 'react-bootstrap';
+import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner, Tab, Tabs } from 'react-bootstrap';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,16 @@ export default function Forum() {
   const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ show: false, postId: null, postTitle: '' });
+  const [activeCategory, setActiveCategory] = useState('all');
+
+  const categories = [
+    { value: 'all', label: 'All Posts' },
+    { value: 'general', label: 'General' },
+    { value: 'support', label: 'Support' },
+    { value: 'resources', label: 'Resources' },
+    { value: 'success', label: 'Success Stories' },
+    { value: 'questions', label: 'Questions' },
+  ];
 
   useEffect(() => {
     fetchThreads();
@@ -22,7 +32,6 @@ export default function Forum() {
   const fetchThreads = async () => {
     try {
       const res = await api.get('/api/forum/threads');
-      console.log('Fetched threads:', res.data);
       setThreads(res.data);
     } catch (err) {
       console.error("Fetch threads error:", err);
@@ -31,6 +40,10 @@ export default function Forum() {
       setLoading(false);
     }
   };
+
+  const filteredThreads = threads.filter(thread => 
+    activeCategory === 'all' || thread.category === activeCategory
+  );
 
   const createThread = async (e) => {
     e.preventDefault();
@@ -53,20 +66,16 @@ export default function Forum() {
     setSubmitting(true);
 
     try {
-      console.log("🔍 Submitting post for moderation...");
       const res = await api.post('/api/forum/threads', { 
         title, 
         body,
         category 
       });
 
-      console.log("Server response:", res.data);
-
       const approvalStatus = res.data.approval_status;
-      const message = res.data.message;
 
       if (approvalStatus === 'approved') {
-        toast.success(message || ' Your post has been published!');
+        toast.success('Your post has been published!');
         setTitle('');
         setBody('');
         setCategory('general');
@@ -74,7 +83,7 @@ export default function Forum() {
         fetchThreads();
       } else if (approvalStatus === 'pending') {
         toast.warning(
-          message || ' Your post is pending review. It will appear after moderator approval.',
+          'Your post is pending review. It will appear after moderator approval.',
           { autoClose: 6000 }
         );
         setTitle('');
@@ -88,38 +97,19 @@ export default function Forum() {
 
     } catch (err) {
       console.error("Create thread error:", err);
-      console.error("Error response:", err.response);
       
       if (err.response?.status === 400) {
         const errorData = err.response.data;
         const reason = errorData.reason || errorData.error || 'Content did not pass moderation';
-        const message = errorData.message || '';
-        
-        toast.error(
-          ` ${reason}${message ? ' - ' + message : ''}`,
-          { autoClose: 7000 }
-        );
+        toast.error(`${reason}`, { autoClose: 7000 });
       } else if (err.response?.status === 429) {
         const retryAfter = err.response.data?.retryAfter || 2;
-        toast.error(
-          `⏱Too many requests. Please wait ${retryAfter} seconds and try again.`,
-          { autoClose: 5000 }
-        );
+        toast.error(`Too many requests. Please wait ${retryAfter} seconds and try again.`, { autoClose: 5000 });
       } else if (err.response?.status === 403) {
         const categories = err.response.data.categories || [];
-        toast.error(
-          `Post rejected by moderation. ${
-            categories.length > 0 ? `Flagged: ${categories.join(', ')}` : ''
-          }`,
-          { autoClose: 5000 }
-        );
-      } else if (err.response?.status === 503) {
-        toast.error(
-          ' Moderation service unavailable. Please try again in a moment.',
-          { autoClose: 6000 }
-        );
-      } else if (err.response?.status === 401) {
-        toast.error('Please log in to post');
+        toast.error(`Post rejected by moderation. ${
+          categories.length > 0 ? `Flagged: ${categories.join(', ')}` : ''
+        }`, { autoClose: 5000 });
       } else {
         toast.error(err.response?.data?.error || 'Failed to create post. Please try again.');
       }
@@ -138,20 +128,13 @@ export default function Forum() {
 
   const confirmDelete = async () => {
     try {
-      console.log(` Deleting post ${deleteModal.postId}`);
       await api.delete(`/api/forum/threads/${deleteModal.postId}`);
-      toast.success(' Post deleted successfully');
+      toast.success('Post deleted');
       setDeleteModal({ show: false, postId: null, postTitle: '' });
       fetchThreads();
     } catch (err) {
       console.error("Delete error:", err);
-      if (err.response?.status === 404) {
-        toast.error(' Post not found');
-      } else if (err.response?.status === 403) {
-        toast.error(' You can only delete your own posts');
-      } else {
-        toast.error(' Failed to delete post');
-      }
+      toast.error('Failed to delete post');
     }
   };
 
@@ -180,64 +163,110 @@ export default function Forum() {
 
   if (loading) {
     return (
-      <Container className="mt-4 text-center">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-2">Loading forum...</p>
+      <Container className="mt-4 text-center py-5">
+        <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }} />
+        <p className="mt-3 text-muted">Loading community forum...</p>
       </Container>
     );
   }
 
   return (
     <Container className="mt-4 mb-5">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+      {/* Page Header */}
+      <div className="mc-section-title d-flex justify-content-between align-items-end">
         <div>
-          <h2>
-            <i className="bi bi-chat-dots me-2"></i>
+          <h2 className="mb-0">
+            <i className="bi bi-chat-dots me-2 text-info"></i>
             Community Forum
           </h2>
-          <p className="text-muted">Share experiences and support each other</p>
+          <p className="text-muted mb-0 mt-1">Share experiences and support each other</p>
         </div>
-        <Button variant="primary" onClick={() => setShowModal(true)}>
+        <Button 
+          variant="info" 
+          onClick={() => setShowModal(true)}
+          className="rounded-pill px-4"
+        >
           <i className="bi bi-plus-circle me-2"></i>
           New Thread
         </Button>
       </div>
 
-      <Alert variant="info" className="mb-4 shadow-sm">
+      <Alert variant="info" className="mb-4 shadow-sm border-0" style={{ 
+        borderRadius: 'var(--mc-radius-lg)',
+        background: 'linear-gradient(135deg, var(--mc-info-light) 0%, var(--mc-info-light) 100%)'
+      }}>
         <div className="d-flex align-items-start">
-          <i className="bi bi-shield-check me-3" style={{ fontSize: "1.5rem" }}></i>
+          <i className="bi bi-shield-check me-3" style={{ fontSize: "1.5rem", color: 'var(--mc-info)' }}></i>
           <div>
             <strong>AI Moderation Active</strong>
             <p className="mb-0 mt-1 small">
-              All posts are automatically checked for safety before being published. 
-              Posts containing harmful, unsafe, or inappropriate content will be rejected 
+              All posts are automatically checked for safety before being published.
+              Posts containing harmful, unsafe, or inappropriate content will be rejected
               or held for manual review.
             </p>
           </div>
         </div>
       </Alert>
 
+      {/* Category Tabs */}
+      <Tabs
+        activeKey={activeCategory}
+        onSelect={(k) => setActiveCategory(k)}
+        className="mb-4 border-0"
+        style={{
+          '--bs-nav-tabs-border-width': '0',
+          '--bs-nav-tabs-link-hover-border-color': 'transparent',
+        }}
+      >
+        {categories.map((cat) => (
+          <Tab 
+            key={cat.value} 
+            eventKey={cat.value} 
+            title={
+              <span className="rounded-pill px-3 py-2">
+                {cat.label}
+              </span>
+            }
+          />
+        ))}
+      </Tabs>
+
       {threads.length === 0 ? (
-        <Card className="text-center p-5 shadow-sm">
-          <i className="bi bi-chat-square-text text-muted" style={{ fontSize: "3rem" }}></i>
-          <h4 className="mt-3">No threads yet</h4>
-          <p className="text-muted">Be the first to start a conversation!</p>
-          <Button variant="primary" onClick={() => setShowModal(true)} size="lg">
-            <i className="bi bi-plus-circle me-2"></i>
-            Create First Thread
-          </Button>
+        <Card className="mc-empty-state border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+          <Card.Body className="p-5">
+            <i className="bi bi-chat-square-text display-1 text-info opacity-50"></i>
+            <h4 className="mt-3 mb-2">No threads yet</h4>
+            <p className="text-muted mb-4">Be the first to start a conversation!</p>
+            <Button 
+              variant="info" 
+              onClick={() => setShowModal(true)}
+              size="lg"
+              className="rounded-pill px-4"
+            >
+              <i className="bi bi-plus-circle me-2"></i>
+              Create First Thread
+            </Button>
+          </Card.Body>
+        </Card>
+      ) : filteredThreads.length === 0 ? (
+        <Card className="mc-empty-state border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+          <Card.Body className="p-5">
+            <i className="bi bi-chat-square-text display-1 text-muted opacity-50"></i>
+            <h4 className="mt-3 mb-2">No posts in this category</h4>
+            <p className="text-muted mb-4">Try selecting a different category</p>
+          </Card.Body>
         </Card>
       ) : (
         <div>
-          {threads.map((thread) => (
-            <Card key={thread.id} className="mb-3 shadow-sm hover-card">
-              <Card.Body>
+          {filteredThreads.map((thread) => (
+            <Card key={thread.id} className="mb-3 shadow-sm mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+              <Card.Body className="p-4">
                 <div className="d-flex justify-content-between align-items-start">
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center mb-2">
                       <h5 className="mb-0">{thread.title || "Forum Post"}</h5>
                       {thread.category && thread.category !== 'general' && (
-                        <Badge bg="secondary" className="ms-2 small">
+                        <Badge bg="secondary" className="ms-2 rounded-pill small">
                           {thread.category}
                         </Badge>
                       )}
@@ -253,36 +282,37 @@ export default function Forum() {
                         <i className="bi bi-clock me-1"></i>
                         {formatDate(thread.created_at)}
                       </div>
-                      {/* Delete button  */}
-                      {isAuthor(thread) && (
-                        <Button 
-                          variant="outline-danger" 
-                          size="sm"
-                          onClick={() => handleDeleteClick(thread)}
-                          className="delete-btn"
+                      <div className="d-flex align-items-center gap-2">
+                        {isAuthor(thread) && (
+                          <Button 
+                            variant="outline-danger" 
+                            size="sm"
+                            className="rounded-pill"
+                            onClick={() => handleDeleteClick(thread)}
+                          >
+                            <i className="bi bi-trash me-1"></i>
+                            Delete
+                          </Button>
+                        )}
+                        <Badge 
+                          bg={
+                            thread.approval_status === 'approved' ? 'success' : 
+                            thread.approval_status === 'pending' ? 'warning' : 
+                            'secondary'
+                          }
+                          text={thread.approval_status === 'pending' ? 'dark' : 'white'}
+                          className="rounded-pill"
                         >
-                          <i className="bi bi-trash me-1"></i>
-                          Delete
-                        </Button>
-                      )}
+                          <i className={`bi ${
+                            thread.approval_status === 'approved' ? 'bi-check-circle' : 
+                            thread.approval_status === 'pending' ? 'bi-clock' : 
+                            'bi-question-circle'
+                          } me-1`}></i>
+                          {thread.approval_status || 'approved'}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                  <Badge 
-                    bg={
-                      thread.approval_status === 'approved' ? 'success' : 
-                      thread.approval_status === 'pending' ? 'warning' : 
-                      'secondary'
-                    }
-                    text={thread.approval_status === 'pending' ? 'dark' : 'white'}
-                    className="ms-3"
-                  >
-                    <i className={`bi ${
-                      thread.approval_status === 'approved' ? 'bi-check-circle' : 
-                      thread.approval_status === 'pending' ? 'bi-clock' : 
-                      'bi-question-circle'
-                    } me-1`}></i>
-                    {thread.approval_status || 'approved'}
-                  </Badge>
                 </div>
               </Card.Body>
             </Card>
@@ -291,23 +321,25 @@ export default function Forum() {
       )}
 
       {/* Create Thread Modal */}
-      <Modal show={showModal} onHide={() => !submitting && setShowModal(false)} size="lg">
-        <Modal.Header closeButton={!submitting}>
+      <Modal show={showModal} onHide={() => !submitting && setShowModal(false)} size="lg" centered>
+        <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title>
-            <i className="bi bi-plus-circle me-2"></i>
+            <i className="bi bi-plus-circle me-2 text-info"></i>
             Create New Thread
           </Modal.Title>
         </Modal.Header>
         <Form onSubmit={createThread}>
-          <Modal.Body>
-            <Alert variant="info" className="small">
+          <Modal.Body className="pt-3">
+            <Alert variant="info" className="small mb-4 rounded-3">
               <i className="bi bi-info-circle me-2"></i>
-              Your post will be automatically checked by AI moderation before publishing. 
+              Your post will be automatically checked by AI moderation before publishing.
               Please follow our community guidelines.
             </Alert>
 
             <Form.Group className="mb-3">
-              <Form.Label>Thread Title *</Form.Label>
+              <Form.Label className="fw-medium">
+                <i className="bi bi-card-heading me-2"></i>Thread Title *
+              </Form.Label>
               <Form.Control
                 type="text"
                 placeholder="Enter a descriptive title (5-200 characters)"
@@ -316,6 +348,7 @@ export default function Forum() {
                 maxLength={200}
                 required
                 disabled={submitting}
+                className="rounded-pill py-2 px-3"
               />
               <Form.Text className="text-muted">
                 {title.length}/200 characters
@@ -326,11 +359,14 @@ export default function Forum() {
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>Category</Form.Label>
+              <Form.Label className="fw-medium">
+                <i className="bi bi-tag me-2"></i>Category
+              </Form.Label>
               <Form.Select 
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 disabled={submitting}
+                className="rounded-pill py-2 px-3"
               >
                 <option value="general">General Discussion</option>
                 <option value="support">Support & Advice</option>
@@ -340,17 +376,20 @@ export default function Forum() {
               </Form.Select>
             </Form.Group>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Content *</Form.Label>
+            <Form.Group className="mb-4">
+              <Form.Label className="fw-medium">
+                <i className="bi bi-chat-left-text me-2"></i>Content *
+              </Form.Label>
               <Form.Control
                 as="textarea"
-                rows={8}
-                placeholder="Share your thoughts, experiences, or questions (minimum 10 characters)"
+                rows={6}
+                placeholder="Share your thoughts, experiences, or questions..."
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={5000}
                 required
                 disabled={submitting}
+                className="rounded-3"
               />
               <Form.Text className="text-muted">
                 {body.length}/5000 characters
@@ -360,32 +399,34 @@ export default function Forum() {
               </Form.Text>
             </Form.Group>
 
-            <Alert variant="warning" className="small mb-0">
+            <Alert variant="warning" className="small mb-0 rounded-3">
               <strong>
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 Community Guidelines:
               </strong>
               <ul className="mb-0 mt-2">
-                <li>Be respectful, kind, and supportive to all members</li>
-                <li>Don't share personal medical advice - encourage professional consultation</li>
-                <li>Avoid harmful, triggering, or explicit content</li>
-                <li>Respect privacy - don't share personal information</li>
-                <li><strong>Emergency?</strong> Call emergency services or a crisis hotline immediately</li>
+                <li>Be respectful, kind, and supportive</li>
+                <li>Don't share personal medical advice</li>
+                <li>Avoid harmful or explicit content</li>
+                <li>Respect privacy - no personal information</li>
+                <li><strong>Emergency?</strong> Call 988 or emergency services</li>
               </ul>
             </Alert>
           </Modal.Body>
-          <Modal.Footer>
+          <Modal.Footer className="border-0 pt-0">
             <Button 
-              variant="secondary" 
+              variant="outline-secondary" 
               onClick={() => setShowModal(false)} 
               disabled={submitting}
+              className="rounded-pill px-4"
             >
               Cancel
             </Button>
             <Button 
-              variant="primary" 
+              variant="info" 
               type="submit" 
               disabled={submitting || title.length < 5 || body.length < 10}
+              className="rounded-pill px-4"
             >
               {submitting ? (
                 <>
@@ -409,15 +450,15 @@ export default function Forum() {
         onHide={() => setDeleteModal({ show: false, postId: null, postTitle: '' })}
         centered
       >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="bi bi-exclamation-triangle text-danger me-2"></i>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="text-danger fw-bold">
+            <i className="bi bi-exclamation-triangle me-2"></i>
             Confirm Delete
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           <p>Are you sure you want to delete this post?</p>
-          <Card className="bg-light border-0">
+          <Card className="bg-light border-0 rounded-3">
             <Card.Body>
               <strong className="text-dark">{deleteModal.postTitle}</strong>
             </Card.Body>
@@ -427,16 +468,18 @@ export default function Forum() {
             <strong>This action cannot be undone.</strong> Your post will be permanently removed.
           </Alert>
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="border-0 pt-0">
           <Button 
-            variant="secondary" 
+            variant="outline-secondary" 
             onClick={() => setDeleteModal({ show: false, postId: null, postTitle: '' })}
+            className="rounded-pill px-4"
           >
             Cancel
           </Button>
           <Button 
             variant="danger" 
             onClick={confirmDelete}
+            className="rounded-pill px-4"
           >
             <i className="bi bi-trash me-2"></i>
             Delete Post
@@ -444,20 +487,29 @@ export default function Forum() {
         </Modal.Footer>
       </Modal>
 
-      {/* Custom CSS */}
+      {/* Styling for Tabs */}
       <style>{`
-        .hover-card {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        .nav-tabs .nav-link {
+          border: none !important;
+          background: var(--mc-bg-secondary);
+          color: var(--mc-text-secondary);
+          font-weight: 500;
+          transition: all var(--mc-transition-fast);
         }
-        .hover-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+
+        .nav-tabs .nav-link:hover {
+          background: var(--mc-primary-100);
+          color: var(--mc-primary-600);
         }
-        .delete-btn {
-          transition: all 0.2s ease;
+
+        .nav-tabs .nav-link.active {
+          background: var(--mc-bg-gradient) !important;
+          color: white !important;
+          box-shadow: var(--mc-shadow-md);
         }
-        .delete-btn:hover {
-          transform: scale(1.05);
+
+        .nav-tabs {
+          border-bottom: none !important;
         }
       `}</style>
     </Container>

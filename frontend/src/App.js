@@ -1,83 +1,67 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
   Navigate,
-  useLocation,
 } from "react-router-dom";
+
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap-icons/font/bootstrap-icons.css";
 
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
+
 import Navigation from "./components/Navigation";
 import Footer from "./components/Footer";
-import BottomBar from "./components/BottomBar"; 
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Medications from "./pages/Medications";
-import Appointments from "./pages/Appointments";
-import Forum from "./pages/Forum";
-import Profile from "./pages/Profile";
+import LoadingSpinner from "./components/LoadingSpinner";
 
-// Loading Screen
-function LoadingScreen() {
-  return (
-    <div className="mc-loading-screen">
-      <div className="mc-loading-content">
-        <i className="bi bi-brain mc-loading-logo"></i>
-        <div className="mc-loading-spinner"></div>
-        <p className="mc-loading-text">Loading...</p>
-      </div>
-    </div>
-  );
-}
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Forum = lazy(() => import("./pages/Forum"));
+const Appointments = lazy(() => import("./pages/Appointments"));
+const Medications = lazy(() => import("./pages/Medications"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Protected Route
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
 
-  if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/" replace />;
-  return children;
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
-// Public Route
 function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
 
-  if (loading) return <LoadingScreen />;
-  if (user) return <Navigate to="/dashboard" replace />;
-  return children;
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
 }
 
-// Layout Manager
-function Layout() {
-  const { user } = useAuth();
-  const location = useLocation();
-
-  // Detect login/register pages
-  const isAuthPage = ["/", "/register"].includes(location.pathname);
-
+function App() {
   return (
-    <div className="d-flex flex-column min-vh-100">
-      {/* Hide Navigation on auth pages for a cleaner look */}
-      {!isAuthPage && <Navigation />}
+    <BrowserRouter>
+      <ToastContainer position="top-right" autoClose={3000} />
 
-      <main className="flex-grow-1">
+      <Navigation />
+
+      <Suspense fallback={<LoadingSpinner />}>
         <Routes>
-          {/* Public Routes */}
           <Route
-            path="/"
+            path="/login"
             element={
               <PublicRoute>
                 <Login />
               </PublicRoute>
             }
           />
+
           <Route
             path="/register"
             element={
@@ -87,7 +71,6 @@ function Layout() {
             }
           />
 
-          {/* Protected Routes */}
           <Route
             path="/dashboard"
             element={
@@ -96,30 +79,7 @@ function Layout() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/medications"
-            element={
-              <ProtectedRoute>
-                <Medications />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/appointments"
-            element={
-              <ProtectedRoute>
-                <Appointments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/forum"
-            element={
-              <ProtectedRoute>
-                <Forum />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/profile"
             element={
@@ -129,48 +89,47 @@ function Layout() {
             }
           />
 
-          {/* Redirect unknown paths */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/forum"
+            element={
+              <ProtectedRoute>
+                <Forum />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/appointments"
+            element={
+              <ProtectedRoute>
+                <Appointments />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/medications"
+            element={
+              <ProtectedRoute>
+                <Medications />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/"
+            element={<Navigate to="/dashboard" replace />}
+          />
+
+          <Route
+            path="*"
+            element={<NotFound />}
+          />
         </Routes>
-      </main>
+      </Suspense>
 
-      {/* Footer */}
-      {user && !isAuthPage && <Footer />}
-
-      {/* BottomBar */}
-      {!user && isAuthPage && <BottomBar />}
-    </div>
-  );
-}
-
-// App Routes
-function AppRoutes() {
-  return (
-    <BrowserRouter>
-      <Layout />
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-        className="rounded"
-      />
+      <Footer />
     </BrowserRouter>
-  );
-}
-
-// Main App
-function App() {
-  return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
   );
 }
 

@@ -1,5 +1,5 @@
-import React from "react";
-import { Navbar, Nav, Container, Button, Badge } from "react-bootstrap";
+import React, { useState, useEffect } from "react";
+import { Navbar, Nav, Container, Button } from "react-bootstrap";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
@@ -8,6 +8,15 @@ function Navigation() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -18,149 +27,133 @@ function Navigation() {
     return location.pathname === path;
   };
 
+  const navItems = [
+    { path: '/dashboard', icon: 'bi-speedometer2', label: 'Dashboard' },
+    { path: '/medications', icon: 'bi-capsule', label: 'Medications' },
+    { path: '/appointments', icon: 'bi-calendar-event', label: 'Appointments' },
+    { path: '/forum', icon: 'bi-chat-dots', label: 'Forum' },
+    { path: '/profile', icon: 'bi-person-circle', label: 'Profile' },
+  ];
+
   return (
-    <>
-      <Navbar
-        expand="lg"
-        sticky="top"
-        className="navbar-custom shadow"
-        style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        }}
-      >
-        <Container>
-          <Navbar.Brand 
-            as={Link} 
-            to={user ? "/dashboard" : "/"} 
-            className="brand-custom"
-          >
-            <i className="bi bi-brain me-2" style={{ fontSize: '1.5rem' }}></i>
-            <span className="fw-bold">MindCare</span>
-          </Navbar.Brand>
+    <Navbar
+      expand="lg"
+      className={`navbar-custom shadow-sm ${scrolled ? 'scrolled' : ''}`}
+      style={{
+        background: scrolled 
+          ? 'rgba(255, 255, 255, 0.9)' 
+          : 'linear-gradient(135deg, var(--mc-primary-600) 0%, var(--mc-primary-700) 100%)',
+        backdropFilter: scrolled ? 'blur(20px)' : 'none',
+        transition: 'all var(--mc-transition-normal)',
+      }}
+    >
+      <Container>
+        <Navbar.Brand 
+          as={Link} 
+          to={user ? "/dashboard" : "/"} 
+          className="brand-custom d-flex align-items-center"
+          style={scrolled ? { color: 'var(--mc-primary-600)' } : {}}
+        >
+          <i className="bi bi-brain me-2" style={{ fontSize: '1.5rem' }}></i>
+          <span className="fw-bold">MindCare</span>
+        </Navbar.Brand>
 
-          <Navbar.Toggle 
-            aria-controls="main-navbar-nav" 
-            className="border-0"
-            style={{ 
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              borderRadius: '8px'
-            }}
-          >
-            <span className="navbar-toggler-icon"></span>
-          </Navbar.Toggle>
+        <Navbar.Toggle 
+          aria-controls="main-navbar-nav" 
+          className="border-0"
+          style={{ 
+            backgroundColor: scrolled ? 'var(--mc-primary-100)' : 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '8px',
+            padding: '0.5rem',
+            transition: 'all var(--mc-transition-fast)'
+          }}
+        >
+          <span className="navbar-toggler-icon"></span>
+        </Navbar.Toggle>
 
-          <Navbar.Collapse id="main-navbar-nav">
-            <Nav className="me-auto ms-lg-4">
-              {user ? (
-                <>
-                  <Nav.Link 
-                    as={Link} 
-                    to="/dashboard"
-                    className={`nav-link-custom ${isActive('/dashboard') ? 'active' : ''}`}
-                  >
-                    <i className="bi bi-speedometer2 me-2"></i>
-                    Dashboard
-                  </Nav.Link>
-                  <Nav.Link 
-                    as={Link} 
-                    to="/medications"
-                    className={`nav-link-custom ${isActive('/medications') ? 'active' : ''}`}
-                  >
-                    <i className="bi bi-capsule me-2"></i>
-                    Medications
-                  </Nav.Link>
-                  <Nav.Link 
-                    as={Link} 
-                    to="/appointments"
-                    className={`nav-link-custom ${isActive('/appointments') ? 'active' : ''}`}
-                  >
-                    <i className="bi bi-calendar-event me-2"></i>
-                    Appointments
-                  </Nav.Link>
-                  <Nav.Link 
-                    as={Link} 
-                    to="/forum"
-                    className={`nav-link-custom ${isActive('/forum') ? 'active' : ''}`}
-                  >
-                    <i className="bi bi-chat-dots me-2"></i>
-                    Forum
-                  </Nav.Link>
-                  <Nav.Link 
-                    as={Link} 
-                    to="/profile"
-                    className={`nav-link-custom ${isActive('/profile') ? 'active' : ''}`}
-                  >
-                    <i className="bi bi-person-circle me-2"></i>
-                    Profile
-                  </Nav.Link>
-                </>
-              ) : null}
-            </Nav>
+        <Navbar.Collapse id="main-navbar-nav">
+          <Nav className="me-auto ms-lg-4">
+            {user && navItems.map((item) => (
+              <Nav.Link 
+                key={item.path}
+                as={Link} 
+                to={item.path}
+                className={`nav-link-custom d-flex align-items-center ${isActive(item.path) ? 'active' : ''}`}
+              >
+                <i className={`bi ${item.icon} me-2`}></i>
+                {item.label}
+              </Nav.Link>
+            ))}
+          </Nav>
 
-            <Nav className="align-items-lg-center">
-              {user ? (
-                <div className="d-flex align-items-center gap-2">
-                  {/* Notification Bell */}
-                  <NotificationBell />
-                  {/* User Info  */}
-                  <div className="text-white me-2 d-none d-lg-block">
-                    <small className="opacity-75">Welcome,</small>
-                    <div className="fw-bold" style={{ fontSize: '0.9rem' }}>
-                      {user.name || user.email}
-                    </div>
+          <Nav className="align-items-lg-center">
+            {user ? (
+              <div className="d-flex align-items-center gap-2">
+                <NotificationBell />
+                
+                <div className="text-white me-2 d-none d-lg-block">
+                  <small className="opacity-75 d-block" style={{ fontSize: '0.75rem' }}>Welcome,</small>
+                  <div className="fw-bold" style={{ 
+                    fontSize: '0.9rem',
+                    color: scrolled ? 'var(--mc-text-primary)' : 'var(--mc-text-inverse)'
+                  }}>
+                    {user.name || user.email}
                   </div>
-                  
-                  {/* Logout Button */}
-                  <Button
-                    variant="light"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="logout-btn"
-                  >
-                    <i className="bi bi-box-arrow-right me-2"></i>
-                    Logout
-                  </Button>
                 </div>
-              ) : (
-                <div className="d-flex gap-2 mt-2 mt-lg-0">
-                  <Button
-                    as={Link}
-                    to="/"
-                    variant="outline-light"
-                    size="sm"
-                    className="auth-btn"
-                  >
-                    <i className="bi bi-box-arrow-in-right me-2"></i>
-                    Login
-                  </Button>
-                  <Button
-                    as={Link}
-                    to="/register"
-                    variant="light"
-                    size="sm"
-                    className="auth-btn-register"
-                  >
-                    <i className="bi bi-person-plus me-2"></i>
-                    Register
-                  </Button>
-                </div>
-              )}
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
+                
+                <Button
+                  variant={scrolled ? "primary" : "light"}
+                  size="sm"
+                  onClick={handleLogout}
+                  className="logout-btn d-flex align-items-center"
+                >
+                  <i className="bi bi-box-arrow-right me-2"></i>
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <div className="d-flex gap-2 mt-2 mt-lg-0">
+                <Button
+                  as={Link}
+                  to="/"
+                  variant={scrolled ? "outline-primary" : "outline-light"}
+                  size="sm"
+                  className="auth-btn"
+                >
+                  <i className="bi bi-box-arrow-in-right me-2"></i>
+                  Login
+                </Button>
+                <Button
+                  as={Link}
+                  to="/register"
+                  variant={scrolled ? "primary" : "light"}
+                  size="sm"
+                  className="auth-btn-register"
+                >
+                  <i className="bi bi-person-plus me-2"></i>
+                  Register
+                </Button>
+              </div>
+            )}
+          </Nav>
+        </Navbar.Collapse>
+      </Container>
 
       {/* Custom Styles */}
       <style>{`
         .navbar-custom {
           padding: 1rem 0;
-          backdrop-filter: blur(10px);
+          transition: all var(--mc-transition-normal);
+        }
+
+        .navbar-custom.scrolled {
+          padding: 0.75rem 0;
+          box-shadow: var(--mc-shadow-md) !important;
         }
 
         .brand-custom {
-          color: white !important;
           font-size: 1.5rem;
-          transition: transform 0.3s ease, opacity 0.3s ease;
+          transition: all var(--mc-transition-normal);
         }
 
         .brand-custom:hover {
@@ -169,25 +162,25 @@ function Navigation() {
         }
 
         .nav-link-custom {
-          color: rgba(255, 255, 255, 0.9) !important;
+          color: ${scrolled ? 'var(--mc-text-primary)' : 'rgba(255, 255, 255, 0.9)'} !important;
           padding: 0.6rem 1rem !important;
           margin: 0.2rem;
           border-radius: 8px;
           font-weight: 500;
-          transition: all 0.3s ease;
+          transition: all var(--mc-transition-normal);
           position: relative;
         }
 
         .nav-link-custom:hover {
-          color: white !important;
-          background-color: rgba(255, 255, 255, 0.15);
+          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
+          background-color: ${scrolled ? 'var(--mc-primary-50)' : 'rgba(255, 255, 255, 0.15)'};
           transform: translateY(-2px);
         }
 
         .nav-link-custom.active {
-          color: white !important;
-          background-color: rgba(255, 255, 255, 0.25);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
+          background-color: ${scrolled ? 'var(--mc-primary-100)' : 'rgba(255, 255, 255, 0.25)'};
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .nav-link-custom.active::after {
@@ -196,9 +189,9 @@ function Navigation() {
           bottom: 0;
           left: 50%;
           transform: translateX(-50%);
-          width: 40px;
+          width: 30px;
           height: 3px;
-          background-color: white;
+          background: ${scrolled ? 'var(--mc-primary-600)' : 'white'};
           border-radius: 2px;
         }
 
@@ -206,73 +199,35 @@ function Navigation() {
           padding: 0.5rem 1.2rem;
           border-radius: 8px;
           font-weight: 600;
-          transition: all 0.3s ease;
-          border: none;
+          transition: all var(--mc-transition-normal);
         }
 
         .logout-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          box-shadow: var(--mc-shadow-md);
         }
 
         .auth-btn {
           padding: 0.5rem 1.2rem;
           border-radius: 8px;
           font-weight: 600;
-          border: 2px solid white;
-          transition: all 0.3s ease;
-        }
-
-        .auth-btn:hover {
-          background-color: white;
-          color: #667eea !important;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          transition: all var(--mc-transition-normal);
         }
 
         .auth-btn-register {
           padding: 0.5rem 1.2rem;
           border-radius: 8px;
           font-weight: 600;
-          background-color: white;
-          color: #667eea;
-          border: 2px solid white;
-          transition: all 0.3s ease;
+          transition: all var(--mc-transition-normal);
         }
 
-        .auth-btn-register:hover {
-          background-color: transparent;
-          color: white !important;
-          border-color: white;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .navbar-toggler {
-          padding: 0.5rem;
-        }
-
-        .navbar-toggler:focus {
-          box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.3);
-        }
-
-        /*  responsiveness */
         @media (max-width: 991px) {
           .nav-link-custom {
             margin: 0.3rem 0;
           }
-
-          .navbar-custom {
-            padding: 0.8rem 0;
-          }
-        }
-
-        /* Smooth collapse animation */
-        .navbar-collapse {
-          transition: height 0.3s ease;
         }
       `}</style>
-    </>
+    </Navbar>
   );
 }
 

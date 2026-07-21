@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
         password 
       });
 
-      const { access, user: userData } = res.data;
+      const { access } = res.data;
 
       if (!access) {
         throw new Error("No token received from server");
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
         password 
       });
 
-      const { access, user: userData } = res.data;
+      const { access } = res.data;
 
       if (!access) {
         throw new Error("No token received from server");

@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dropdown, Badge, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { 
-  getNotifications, 
-  markNotificationAsRead, 
-  markAllNotificationsAsRead,
-  deleteNotification 
-} from '../services/api';
+import api from '../services/api';
 
 function NotificationBell() {
   const [notifications, setNotifications] = useState([]);
@@ -34,7 +29,8 @@ function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const data = await getNotifications();
+      const res = await api.get('/api/notifications');
+      const data = res.data;
       setNotifications(data);
       
       const unread = data.filter(n => !n.is_read).length;
@@ -73,7 +69,7 @@ function NotificationBell() {
   const handleMarkAsRead = async (id, e) => {
     e.stopPropagation(); 
     try {
-      await markNotificationAsRead(id);
+      await api.put(`/api/notifications/${id}/read`);
       await fetchNotifications();
     } catch (err) {
       console.error('Mark as read error:', err);
@@ -86,7 +82,7 @@ function NotificationBell() {
     
     setLoading(true);
     try {
-      await markAllNotificationsAsRead();
+      await api.put('/api/notifications/read-all');
       await fetchNotifications();
       toast.success('All notifications marked as read');
     } catch (err) {
@@ -100,7 +96,7 @@ function NotificationBell() {
   const handleDelete = async (id, e) => {
     e.stopPropagation();
     try {
-      await deleteNotification(id);
+      await api.delete(`/api/notifications/${id}`);
       await fetchNotifications();
       toast.success('Notification deleted');
     } catch (err) {

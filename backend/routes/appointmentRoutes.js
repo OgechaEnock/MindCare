@@ -118,6 +118,52 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 /**
+ * Get pending appointment reminders
+ */
+router.get("/reminders/pending", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, appointment_date, appointment_time, reminder_24h, reminder_1h, notified_24h, notified_1h
+       FROM appointments 
+       WHERE user_id = $1 AND appointment_date >= CURRENT_DATE`,
+      [req.user.id]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Get pending reminders error:", err.message);
+    res.status(500).json({ error: "Failed to get pending reminders" });
+  }
+});
+
+/**
+ * Mark appointment reminder as sent
+ */
+router.post("/reminders/:id/mark-sent", authenticateToken, async (req, res) => {
+  try {
+    const { type } = req.body;
+    const { id } = req.params;
+
+    if (type === '24h') {
+      await pool.query(
+        "UPDATE appointments SET notified_24h = true WHERE id = $1 AND user_id = $2",
+        [id, req.user.id]
+      );
+    } else if (type === '1h') {
+      await pool.query(
+        "UPDATE appointments SET notified_1h = true WHERE id = $1 AND user_id = $2",
+        [id, req.user.id]
+      );
+    }
+
+    res.json({ message: "Reminder marked as sent" });
+  } catch (err) {
+    console.error("Mark reminder as sent error:", err.message);
+    res.status(500).json({ error: "Failed to mark reminder as sent" });
+  }
+});
+
+/**
  *  Delete an appointment 
  */
 router.delete("/:id", authenticateToken, async (req, res) => {

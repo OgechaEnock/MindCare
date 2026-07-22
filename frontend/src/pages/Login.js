@@ -17,7 +17,7 @@ function Login() {
 
     const result = await login({ email, password });
 
-    if (result) {
+    if (result.success) {
       navigate("/dashboard");
     }
 

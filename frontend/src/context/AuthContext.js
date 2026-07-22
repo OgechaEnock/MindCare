@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useCallback, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 
@@ -17,11 +17,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setCurrentUser] = useState(getUser());
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    restoreSession();
+  const logout = useCallback((showMessage = true) => {
+    authService.logout();
+
+    clearStorage();
+
+    setCurrentUser(null);
+
+    if (showMessage) {
+      toast.info("Logged out.");
+    }
   }, []);
 
-  const restoreSession = () => {
+  const restoreSession = useCallback(() => {
     try {
       const token = getToken();
 
@@ -58,9 +66,13 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [logout]);
 
-  const login = async (credentials) => {
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
+  const login = useCallback(async (credentials) => {
     try {
       const response = await authService.login(credentials);
 
@@ -88,18 +100,18 @@ export const AuthProvider = ({ children }) => {
 
       toast.success("Welcome back!");
 
-      return true;
+      return { success: true };
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
           "Invalid email or password."
       );
 
-      return false;
+      return { success: false };
     }
-  };
+  }, []);
 
-  const register = async (payload) => {
+  const register = useCallback(async (payload) => {
     try {
       await authService.register(payload);
 
@@ -116,19 +128,7 @@ export const AuthProvider = ({ children }) => {
 
       return false;
     }
-  };
-
-  const logout = (showMessage = true) => {
-    authService.logout();
-
-    clearStorage();
-
-    setCurrentUser(null);
-
-    if (showMessage) {
-      toast.info("Logged out.");
-    }
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }) => {
       register,
       isAuthenticated: !!user,
     }),
-    [user, loading]
+    [user, loading, login, logout, register]
   );
 
   return (

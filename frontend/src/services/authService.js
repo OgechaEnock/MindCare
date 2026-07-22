@@ -1,12 +1,12 @@
 import api from "./api";
 
-const login = async (credentials) => {
-  const response = await api.post("/api/auth/login", credentials);
+const login = async ({ email, password }) => {
+  const response = await api.post("/api/auth/login", { email, password });
   return response.data;
 };
 
-const register = async (userData) => {
-  const response = await api.post("/api/auth/register", userData);
+const register = async (payload) => {
+  const response = await api.post("/api/auth/register", payload);
   return response.data;
 };
 
@@ -17,12 +17,13 @@ const getProfile = async () => {
 
 const logout = () => {
   localStorage.removeItem("authToken");
-  localStorage.removeItem("user");
 };
 
-export default {
+const authService = {
   login,
   register,
   getProfile,
   logout,
 };
+
+export default authService;

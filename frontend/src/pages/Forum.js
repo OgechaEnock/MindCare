@@ -154,12 +154,11 @@ export default function Forum() {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
-    const options = { month: 'short', day: 'numeric' };
-    if (date.getFullYear() !== now.getFullYear()) {
-      options.year = 'numeric';
-    }
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
   };
 
   if (loading) {

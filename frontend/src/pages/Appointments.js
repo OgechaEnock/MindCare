@@ -122,7 +122,7 @@ function Appointments() {
       </div>
 
       {/* Notification permission alert */}
-      {Notification.permission === "default" && (
+      {"Notification" in window && Notification.permission === "default" && (
         <Card className="mb-4 border-0 shadow-sm" style={{ 
           background: 'linear-gradient(135deg, var(--mc-warning) 0%, var(--mc-accent-400) 100%)',
           borderRadius: 'var(--mc-radius-lg)'

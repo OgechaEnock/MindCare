@@ -1,146 +1,132 @@
-import { createContext, useContext, useEffect, useMemo, useCallback, useState } from "react";
+import { createContext, useState, useContext, useEffect } from "react";
+import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 
-import authService from "../services/authService";
-import {
-  clearStorage,
-  getToken,
-  getUser,
-  setToken,
-  setUser,
-} from "../utils/storage";
+const AuthContext = createContext();
 
-const AuthContext = createContext(null);
+// Configure axios base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
+axios.defaults.baseURL = API_BASE_URL;
 
 export const AuthProvider = ({ children }) => {
-  const [user, setCurrentUser] = useState(getUser());
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const logout = useCallback((showMessage = true) => {
-    authService.logout();
-
-    clearStorage();
-
-    setCurrentUser(null);
-
-    if (showMessage) {
-      toast.info("Logged out.");
-    }
-  }, []);
-
-  const restoreSession = useCallback(() => {
-    try {
-      const token = getToken();
-
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const decoded = jwtDecode(token);
-
-      if (decoded.exp * 1000 < Date.now()) {
-        logout(false);
-        return;
-      }
-
-      const savedUser = getUser();
-
-      if (savedUser) {
-        setCurrentUser(savedUser);
-      } else {
-        const newUser = {
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.email,
-          role: decoded.role,
-        };
-
-        setCurrentUser(newUser);
-        setUser(newUser);
-      }
-    } catch (error) {
-      clearStorage();
-      setCurrentUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [logout]);
-
+  // Restore user session on mount
   useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
+    const storedToken = localStorage.getItem("authToken");
+    if (storedToken) {
+      try {
+        const decoded = jwtDecode(storedToken);
+        
+        // Check if token is expired
+        const currentTime = Date.now() / 1000;
+        if (decoded.exp < currentTime) {
+          console.log("Token expired, clearing...");
+          localStorage.removeItem("authToken");
+        } else {
+          setUser(decoded);
+          setToken(storedToken);
+          axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+        }
+      } catch (err) {
+        console.error("Invalid stored token:", err);
+        localStorage.removeItem("authToken");
+      }
+    }
+    setLoading(false);
+  }, []);
 
-  const login = useCallback(async (credentials) => {
+  // Register function
+  const register = async (name, email, password) => {
     try {
-      const response = await authService.login(credentials);
+      const res = await axios.post("/api/auth/register", { 
+        name, 
+        email, 
+        password 
+      });
 
-      const token =
-        response.accessToken ||
-        response.token ||
-        response.access;
+      const { access } = res.data;
 
-      if (!token) {
-        throw new Error("Authentication token not received.");
+      if (!access) {
+        throw new Error("No token received from server");
       }
 
-      const decoded = jwtDecode(token);
+      // Decode token to get user info
+      const decoded = jwtDecode(access);
 
-      const userData = {
-        id: decoded.id,
-        name: decoded.name,
-        email: decoded.email,
-        role: decoded.role,
-      };
+      // Store token
+      localStorage.setItem("authToken", access);
+      setToken(access);
+      setUser(decoded);
 
-      setToken(token);
-      setUser(userData);
-      setCurrentUser(userData);
+      // Set axios default header
+      axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
 
-      toast.success("Welcome back!");
-
+      toast.success("Registration successful!");
       return { success: true };
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          "Invalid email or password."
-      );
-
-      return { success: false };
+    } catch (err) {
+      console.error("Register error:", err);
+      const message = err.response?.data?.error || "Registration failed";
+      toast.error(message);
+      return { success: false, message };
     }
-  }, []);
+  };
 
-  const register = useCallback(async (payload) => {
+  // Login function
+  const login = async (email, password) => {
     try {
-      await authService.register(payload);
+      const res = await axios.post("/api/auth/login", { 
+        email, 
+        password 
+      });
 
-      toast.success(
-        "Account created successfully."
-      );
+      const { access } = res.data;
 
-      return true;
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          "Registration failed."
-      );
+      if (!access) {
+        throw new Error("No token received from server");
+      }
 
-      return false;
+      // Decode token
+      const decoded = jwtDecode(access);
+
+      // Store token
+      localStorage.setItem("authToken", access);
+      setToken(access);
+      setUser(decoded);
+
+      // Set axios default header
+      axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+
+      toast.success("Login successful!");
+      return { success: true };
+    } catch (err) {
+      console.error("Login error:", err);
+      const message = err.response?.data?.error || "Login failed";
+      toast.error(message);
+      return { success: false, message };
     }
-  }, []);
+  };
 
-  const value = useMemo(
-    () => ({
-      user,
-      loading,
-      login,
-      logout,
-      register,
-      isAuthenticated: !!user,
-    }),
-    [user, loading, login, logout, register]
-  );
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem("authToken");
+    setUser(null);
+    setToken(null);
+    delete axios.defaults.headers.common["Authorization"];
+    toast.info("Logged out successfully");
+  };
+
+  const value = {
+    user,
+    token,
+    loading,
+    login,
+    register,
+    logout,
+  };
 
   return (
     <AuthContext.Provider value={value}>
@@ -149,6 +135,11 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
-
-export default AuthContext;
+// Custom hook
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

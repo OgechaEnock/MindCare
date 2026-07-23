@@ -57,13 +57,9 @@ function Register() {
 
     setLoading(true);
 
-    const success = await register({
-      name: form.name,
-      email: form.email,
-      password: form.password
-    });
+    const result = await register(form.name, form.email, form.password);
 
-    if (success) {
+    if (result.success) {
       navigate("/dashboard");
     }
 

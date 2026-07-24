@@ -11,6 +11,21 @@ from utils.time_utils import get_appointment_status
 appointment_bp = Blueprint("appointments", __name__, url_prefix="/api/appointments")
 
 
+def _iso_date(value):
+    """Postgres DATE -> ISO string (e.g. '2026-07-25'). Flask's default
+    JSON encoder handles date/datetime fine, but we normalize explicitly
+    so the shape matches what the frontend previously got from Node."""
+    return value.isoformat() if value is not None else None
+
+
+def _iso_time(value):
+    """Postgres TIME -> 'HH:MM:SS' string. psycopg2 returns TIME columns
+    as datetime.time objects, which Flask's default JSON encoder cannot
+    serialize at all (only date/datetime are supported) - this was the
+    cause of the 500 error on every endpoint returning appointment_time."""
+    return value.isoformat() if value is not None else None
+
+
 @appointment_bp.post("")
 @authenticate_token
 def add_appointment():
@@ -64,8 +79,8 @@ def add_appointment():
             "appointment": {
                 "id": appointment_id,
                 "title": title,
-                "appointment_date": rows[0]["appointment_date"],
-                "appointment_time": rows[0]["appointment_time"],
+                "appointment_date": _iso_date(rows[0]["appointment_date"]),
+                "appointment_time": _iso_time(rows[0]["appointment_time"]),
                 "notes": notes,
                 "reminder_24h": enable_24h,
                 "reminder_1h": enable_1h,
@@ -103,8 +118,8 @@ def get_appointments():
             decrypted.append({
                 "id": row["id"],
                 "title": title,
-                "appointment_date": row["appointment_date"],
-                "appointment_time": row["appointment_time"],
+                "appointment_date": _iso_date(row["appointment_date"]),
+                "appointment_time": _iso_time(row["appointment_time"]),
                 "notes": notes,
                 "reminder_24h": row["reminder_24h"],
                 "reminder_1h": row["reminder_1h"],
@@ -130,7 +145,11 @@ def get_pending_reminders():
                WHERE user_id = %s AND appointment_date >= CURRENT_DATE""",
             (g.user["id"],),
         )
-        return jsonify(rows)
+        serialized = [
+            {**row, "appointment_date": _iso_date(row["appointment_date"]), "appointment_time": _iso_time(row["appointment_time"])}
+            for row in rows
+        ]
+        return jsonify(serialized)
     except Exception as err:
         print(f"Get pending reminders error: {err}")
         return jsonify({"error": "Failed to get pending reminders"}), 500

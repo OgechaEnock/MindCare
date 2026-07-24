@@ -41,7 +41,7 @@ function Navigation() {
       className={`navbar-custom shadow-sm ${scrolled ? 'scrolled' : ''}`}
       style={{
         background: scrolled 
-          ? 'rgba(255, 255, 255, 0.9)' 
+          ? 'rgba(4, 67, 24, 0.9)' 
           : 'linear-gradient(135deg, var(--mc-primary-600) 0%, var(--mc-primary-700) 100%)',
         backdropFilter: scrolled ? 'blur(20px)' : 'none',
         transition: 'all var(--mc-transition-normal)',

@@ -26,3 +26,6 @@ yarn-error.log*
 node_modules/
 build/
 .env
+
+__pycache__/
+*.py[cod]

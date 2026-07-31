@@ -15,6 +15,7 @@ export default function Forum() {
   const [showModal, setShowModal] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ show: false, postId: null, postTitle: '' });
   const [activeCategory, setActiveCategory] = useState('all');
+  const [moderationError, setModerationError] = useState(null);
 
   const categories = [
     { value: 'all', label: 'All Posts' },
@@ -47,6 +48,7 @@ export default function Forum() {
 
   const createThread = async (e) => {
     e.preventDefault();
+    setModerationError(null);
 
     if (!title || !body) {
       toast.error('Title and content are required');
@@ -100,8 +102,20 @@ export default function Forum() {
       
       if (err.response?.status === 400) {
         const errorData = err.response.data;
+        const categories = errorData.categories || [];
         const reason = errorData.reason || errorData.error || 'Content did not pass moderation';
-        toast.error(`${reason}`, { autoClose: 7000 });
+        
+        // Show detailed moderation rejection
+        if (categories.length > 0) {
+          setModerationError({
+            message: reason,
+            categories: categories,
+            details: errorData.message || 'Please review our community guidelines and try again.'
+          });
+          toast.error(`Post rejected: ${categories.join(', ')}`, { autoClose: 8000 });
+        } else {
+          toast.error(`${reason}`, { autoClose: 7000 });
+        }
       } else if (err.response?.status === 429) {
         const retryAfter = err.response.data?.retryAfter || 2;
         toast.error(`Too many requests. Please wait ${retryAfter} seconds and try again.`, { autoClose: 5000 });
@@ -161,6 +175,17 @@ export default function Forum() {
     });
   };
 
+  const getCategoryBadgeVariant = (cat) => {
+    const variants = {
+      general: 'secondary',
+      support: 'primary',
+      resources: 'info',
+      success: 'success',
+      questions: 'warning'
+    };
+    return variants[cat] || 'secondary';
+  };
+
   if (loading) {
     return (
       <Container className="mt-4 text-center py-5">
@@ -183,7 +208,10 @@ export default function Forum() {
         </div>
         <Button 
           variant="info" 
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setModerationError(null);
+            setShowModal(true);
+          }}
           className="rounded-pill px-4"
         >
           <i className="bi bi-plus-circle me-2"></i>
@@ -200,9 +228,9 @@ export default function Forum() {
           <div>
             <strong>AI Moderation Active</strong>
             <p className="mb-0 mt-1 small">
-              All posts are automatically checked for safety before being published.
+              All posts are automatically checked by AI for safety before being published.
               Posts containing harmful, unsafe, or inappropriate content will be rejected
-              or held for manual review.
+              with specific feedback on what was flagged.
             </p>
           </div>
         </div>
@@ -239,7 +267,10 @@ export default function Forum() {
             <p className="text-muted mb-4">Be the first to start a conversation!</p>
             <Button 
               variant="info" 
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                setModerationError(null);
+                setShowModal(true);
+              }}
               size="lg"
               className="rounded-pill px-4"
             >
@@ -266,7 +297,10 @@ export default function Forum() {
                     <div className="d-flex align-items-center mb-2">
                       <h5 className="mb-0">{thread.title || "Forum Post"}</h5>
                       {thread.category && thread.category !== 'general' && (
-                        <Badge bg="secondary" className="ms-2 rounded-pill small">
+                        <Badge 
+                          bg={getCategoryBadgeVariant(thread.category)} 
+                          className="ms-2 rounded-pill small"
+                        >
                           {thread.category}
                         </Badge>
                       )}
@@ -335,6 +369,31 @@ export default function Forum() {
               Your post will be automatically checked by AI moderation before publishing.
               Please follow our community guidelines.
             </Alert>
+
+            {/* Moderation Error Display */}
+            {moderationError && (
+              <Alert variant="danger" className="mb-4 rounded-3" dismissible onClose={() => setModerationError(null)}>
+                <div className="d-flex align-items-start">
+                  <i className="bi bi-shield-exclamation me-2 mt-1" style={{ fontSize: '1.2rem' }}></i>
+                  <div>
+                    <strong className="d-block mb-1">Post Rejected by AI Moderation</strong>
+                    <p className="mb-1 small">{moderationError.details}</p>
+                    {moderationError.categories.length > 0 && (
+                      <div className="mt-2">
+                        <strong className="small">Flagged categories:</strong>
+                        <div className="d-flex flex-wrap gap-1 mt-1">
+                          {moderationError.categories.map((cat, idx) => (
+                            <Badge key={idx} bg="danger" className="rounded-pill text-capitalize">
+                              {cat.replace(/-/g, ' ')}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Alert>
+            )}
 
             <Form.Group className="mb-3">
               <Form.Label className="fw-medium">
@@ -431,7 +490,7 @@ export default function Forum() {
               {submitting ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2"></span>
-                  Checking & Posting...
+                  AI Checking & Posting...
                 </>
               ) : (
                 <>

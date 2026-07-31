@@ -123,7 +123,7 @@ function Footer() {
         .footer-custom {
           background: var(--mc-bg-primary);
           border-top: 1px solid var(--mc-bg-tertiary);
-          margin-top: var(--mc-space-3xl);
+          margin-top: var(--mc-space-xl);
         }
 
         .footer-main {

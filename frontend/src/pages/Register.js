@@ -78,7 +78,7 @@ function Register() {
       <Container>
         <Card className="mc-auth-card border-0">
           <div className="mc-auth-card-header">
-            <div className="mc-auth-icon" style={{ color: 'var(--mc-success)' }}>
+            <div className="mc-auth-icon">
               <i className="bi bi-person-plus-fill"></i>
             </div>
             <h3 className="mc-auth-title">Create Account</h3>
@@ -197,11 +197,10 @@ function Register() {
             </Form.Group>
 
             <Button 
-              variant="success" 
+              variant="primary" 
               type="submit" 
               className="mc-btn-primary w-100 mb-3"
               disabled={loading}
-              style={{ background: 'linear-gradient(135deg, var(--mc-success) 0%, var(--mc-secondary-600) 100%)' }}
             >
               {loading ? (
                 <>

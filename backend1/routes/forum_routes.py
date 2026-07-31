@@ -125,7 +125,7 @@ def create_thread():
 def list_threads():
     try:
         rows = query(
-            """SELECT id, title, body, category, author_name, approval_status, created_at, updated_at
+            """SELECT id, user_id, title, body, category, author_name, approval_status, created_at, updated_at
                FROM forum_threads
                WHERE approval_status = 'approved'
                ORDER BY created_at DESC
@@ -135,6 +135,7 @@ def list_threads():
         decrypted_posts = [
             {
                 "id": row["id"],
+                "user_id": row["user_id"],
                 "title": decrypt(row["title"]),
                 "body": decrypt(row["body"]),
                 "category": row["category"],

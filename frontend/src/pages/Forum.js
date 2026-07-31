@@ -153,7 +153,7 @@ export default function Forum() {
   };
 
   const isAuthor = (post) => {
-    return post.author_name === user?.name;
+    return post.user_id === user?.id;
   };
 
   const formatDate = (dateString) => {

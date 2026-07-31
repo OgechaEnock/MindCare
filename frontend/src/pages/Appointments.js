@@ -172,56 +172,103 @@ function Appointments() {
                   Upcoming ({upcomingAppointments.length})
                 </h5>
               </Card.Header>
-              <Card.Body>
-                <Table responsive hover className="mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Title</th>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Notes</th>
-                      <th>Reminders</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <Card.Body className="p-0">
+                <div className="table-responsive-xl">
+                  <Table responsive hover className="mb-0 d-none d-md-table">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Title</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Notes</th>
+                        <th>Reminders</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upcomingAppointments.map((apt) => (
+                        <tr key={apt.id}>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <i className="bi bi-calendar-event text-success me-2"></i>
+                              <strong>{apt.title}</strong>
+                            </div>
+                          </td>
+                          <td>{new Date(apt.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                          <td>{apt.appointment_time}</td>
+                          <td>{apt.notes || "-"}</td>
+                          <td>
+                            {apt.reminder_24h && (
+                              <Badge bg="info" className="me-1 rounded-pill">24h</Badge>
+                            )}
+                            {apt.reminder_1h && (
+                              <Badge bg="warning" text="dark" className="rounded-pill">1h</Badge>
+                            )}
+                            {!apt.reminder_24h && !apt.reminder_1h && (
+                              <Badge bg="secondary" className="rounded-pill">None</Badge>
+                            )}
+                          </td>
+                          <td>
+                            <Button 
+                              variant="outline-danger" 
+                              size="sm" 
+                              onClick={() => handleDelete(apt.id)}
+                              className="rounded-pill"
+                            >
+                              <i className="bi bi-trash me-1"></i>
+                              Cancel
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                  {/* Mobile card view */}
+                  <div className="d-md-none">
                     {upcomingAppointments.map((apt) => (
-                      <tr key={apt.id}>
-                        <td>
+                      <div key={apt.id} className="p-3 border-bottom">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
                           <div className="d-flex align-items-center">
                             <i className="bi bi-calendar-event text-success me-2"></i>
                             <strong>{apt.title}</strong>
                           </div>
-                        </td>
-                        <td>{new Date(apt.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                        <td>{apt.appointment_time}</td>
-                        <td>{apt.notes || "-"}</td>
-                        <td>
-                          {apt.reminder_24h && (
-                            <Badge bg="info" className="me-1 rounded-pill">24h</Badge>
-                          )}
-                          {apt.reminder_1h && (
-                            <Badge bg="warning" text="dark" className="rounded-pill">1h</Badge>
-                          )}
-                          {!apt.reminder_24h && !apt.reminder_1h && (
-                            <Badge bg="secondary" className="rounded-pill">None</Badge>
-                          )}
-                        </td>
-                        <td>
                           <Button 
                             variant="outline-danger" 
                             size="sm" 
                             onClick={() => handleDelete(apt.id)}
-                            className="rounded-pill"
+                            className="rounded-pill ms-2 flex-shrink-0"
                           >
-                            <i className="bi bi-trash me-1"></i>
-                            Cancel
+                            <i className="bi bi-trash"></i>
                           </Button>
-                        </td>
-                      </tr>
+                        </div>
+                        <div className="small text-muted mb-1">
+                          <i className="bi bi-calendar me-1"></i>
+                          {new Date(apt.appointment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          <span className="mx-2">•</span>
+                          <i className="bi bi-clock me-1"></i>
+                          {apt.appointment_time}
+                        </div>
+                        {apt.notes && (
+                          <div className="small text-muted mb-2">
+                            <i className="bi bi-journal-text me-1"></i>
+                            {apt.notes}
+                          </div>
+                        )}
+                        <div>
+                          {apt.reminder_24h && (
+                            <Badge bg="info" className="me-1 rounded-pill">24h reminder</Badge>
+                          )}
+                          {apt.reminder_1h && (
+                            <Badge bg="warning" text="dark" className="rounded-pill">1h reminder</Badge>
+                          )}
+                          {!apt.reminder_24h && !apt.reminder_1h && (
+                            <Badge bg="secondary" className="rounded-pill">No reminders</Badge>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </Table>
+                  </div>
+                </div>
               </Card.Body>
             </Card>
           )}
@@ -235,43 +282,79 @@ function Appointments() {
                   Past Appointments ({pastAppointments.length})
                 </h5>
               </Card.Header>
-              <Card.Body className="pb-0">
-                <Table responsive hover className="mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Title</th>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Notes</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <Card.Body className="p-0">
+                <div className="table-responsive-xl">
+                  <Table responsive hover className="mb-0 d-none d-md-table">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Title</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pastAppointments.slice(0, 5).map((apt) => (
+                        <tr key={apt.id}>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <i className="bi bi-calendar-check text-muted me-2"></i>
+                              {apt.title}
+                            </div>
+                          </td>
+                          <td className="text-muted">{new Date(apt.appointment_date).toLocaleDateString()}</td>
+                          <td className="text-muted">{apt.appointment_time}</td>
+                          <td className="text-muted">{apt.notes || "-"}</td>
+                          <td>
+                            <Button 
+                              variant="outline-danger" 
+                              size="sm" 
+                              onClick={() => handleDelete(apt.id)}
+                              className="rounded-pill"
+                            >
+                              <i className="bi bi-trash"></i>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                  {/* Mobile card view for past appointments */}
+                  <div className="d-md-none">
                     {pastAppointments.slice(0, 5).map((apt) => (
-                      <tr key={apt.id}>
-                        <td>
+                      <div key={apt.id} className="p-3 border-bottom">
+                        <div className="d-flex justify-content-between align-items-start mb-2">
                           <div className="d-flex align-items-center">
                             <i className="bi bi-calendar-check text-muted me-2"></i>
-                            {apt.title}
+                            <span className="text-muted">{apt.title}</span>
                           </div>
-                        </td>
-                        <td className="text-muted">{new Date(apt.appointment_date).toLocaleDateString()}</td>
-                        <td className="text-muted">{apt.appointment_time}</td>
-                        <td className="text-muted">{apt.notes || "-"}</td>
-                        <td>
                           <Button 
                             variant="outline-danger" 
                             size="sm" 
                             onClick={() => handleDelete(apt.id)}
-                            className="rounded-pill"
+                            className="rounded-pill ms-2 flex-shrink-0"
                           >
                             <i className="bi bi-trash"></i>
                           </Button>
-                        </td>
-                      </tr>
+                        </div>
+                        <div className="small text-muted">
+                          <i className="bi bi-calendar me-1"></i>
+                          {new Date(apt.appointment_date).toLocaleDateString()}
+                          <span className="mx-2">•</span>
+                          <i className="bi bi-clock me-1"></i>
+                          {apt.appointment_time}
+                        </div>
+                        {apt.notes && (
+                          <div className="small text-muted mt-1">
+                            <i className="bi bi-journal-text me-1"></i>
+                            {apt.notes}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </tbody>
-                </Table>
+                  </div>
+                </div>
                 {pastAppointments.length > 5 && (
                   <div className="text-center py-3">
                     <small className="text-muted">

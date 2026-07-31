@@ -220,8 +220,10 @@ function Medications() {
                       <h5 className="mb-0 fw-bold">{med.name}</h5>
                     </div>
                     <Badge 
-                      bg={med.reminder_enabled ? "success" : "secondary"} 
+                      bg={med.reminder_enabled ? "success" : "light"} 
+                      text={med.reminder_enabled ? "white" : "dark"}
                       className="rounded-pill"
+                      style={med.reminder_enabled ? {} : { border: '1px solid var(--mc-bg-tertiary)' }}
                     >
                       {med.reminder_enabled ? (
                         <>

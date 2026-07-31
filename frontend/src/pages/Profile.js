@@ -153,10 +153,9 @@ function Profile() {
           <Card className="mb-4 border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
             <Card.Body className="text-center p-4">
               <div className="mb-3">
-                <i className="bi bi-person-circle text-primary" style={{ fontSize: "5rem", opacity: 0.3 }}></i>
                 <div 
-                  className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                  style={{ width: '80px', height: '80px', fontSize: '2rem' }}
+                  className="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3 mx-auto shadow-sm"
+                  style={{ width: '90px', height: '90px', fontSize: '2.5rem', color: 'white' }}
                 >
                   {user?.name?.charAt(0) || 'U'}
                 </div>

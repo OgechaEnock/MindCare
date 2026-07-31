@@ -9,6 +9,7 @@ function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,11 +39,13 @@ function Navigation() {
   return (
     <Navbar
       expand="lg"
+      expanded={expanded}
+      onToggle={setExpanded}
       className={`navbar-custom shadow-sm ${scrolled ? 'scrolled' : ''}`}
       style={{
         background: scrolled 
-          ? 'rgba(4, 67, 24, 0.9)' 
-          : 'linear-gradient(135deg, var(--mc-primary-600) 0%, var(--mc-primary-700) 100%)',
+          ? '#4f46e5'
+          : 'linear-gradient(135deg, #4f46e5 0%, #4338ca 50%, #764ba2 100%)',
         backdropFilter: scrolled ? 'blur(20px)' : 'none',
         transition: 'all var(--mc-transition-normal)',
       }}
@@ -52,7 +55,7 @@ function Navigation() {
           as={Link} 
           to={user ? "/dashboard" : "/"} 
           className="brand-custom d-flex align-items-center"
-          style={scrolled ? { color: 'var(--mc-primary-600)' } : {}}
+          style={scrolled ? { color: 'white' } : {}}
         >
           <i className="bi bi-brain me-2" style={{ fontSize: '1.5rem' }}></i>
           <span className="fw-bold">MindCare</span>
@@ -62,7 +65,7 @@ function Navigation() {
           aria-controls="main-navbar-nav" 
           className="border-0"
           style={{ 
-            backgroundColor: scrolled ? 'var(--mc-primary-100)' : 'rgba(255, 255, 255, 0.2)',
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
             borderRadius: '8px',
             padding: '0.5rem',
             transition: 'all var(--mc-transition-fast)'
@@ -71,7 +74,7 @@ function Navigation() {
           <span className="navbar-toggler-icon"></span>
         </Navbar.Toggle>
 
-        <Navbar.Collapse id="main-navbar-nav">
+        <Navbar.Collapse id="main-navbar-nav" className="navbar-dark-bg">
           <Nav className="me-auto ms-lg-4">
             {user && navItems.map((item) => (
               <Nav.Link 
@@ -79,6 +82,7 @@ function Navigation() {
                 as={Link} 
                 to={item.path}
                 className={`nav-link-custom d-flex align-items-center ${isActive(item.path) ? 'active' : ''}`}
+                onClick={() => setExpanded(false)}
               >
                 <i className={`bi ${item.icon} me-2`}></i>
                 {item.label}
@@ -95,14 +99,14 @@ function Navigation() {
                   <small className="opacity-75 d-block" style={{ fontSize: '0.75rem' }}>Welcome,</small>
                   <div className="fw-bold" style={{ 
                     fontSize: '0.9rem',
-                    color: scrolled ? 'var(--mc-text-primary)' : 'var(--mc-text-inverse)'
+                    color: 'white'
                   }}>
                     {user.name || user.email}
                   </div>
                 </div>
                 
                 <Button
-                  variant={scrolled ? "primary" : "light"}
+                  variant="light"
                   size="sm"
                   onClick={handleLogout}
                   className="logout-btn d-flex align-items-center"
@@ -116,7 +120,7 @@ function Navigation() {
                 <Button
                   as={Link}
                   to="/"
-                  variant={scrolled ? "outline-primary" : "outline-light"}
+                  variant="outline-light"
                   size="sm"
                   className="auth-btn"
                 >
@@ -126,7 +130,7 @@ function Navigation() {
                 <Button
                   as={Link}
                   to="/register"
-                  variant={scrolled ? "primary" : "light"}
+                  variant="light"
                   size="sm"
                   className="auth-btn-register"
                 >
@@ -154,6 +158,7 @@ function Navigation() {
         .brand-custom {
           font-size: 1.5rem;
           transition: all var(--mc-transition-normal);
+          color: white !important;
         }
 
         .brand-custom:hover {
@@ -162,7 +167,7 @@ function Navigation() {
         }
 
         .nav-link-custom {
-          color: ${scrolled ? 'var(--mc-text-primary)' : 'rgba(255, 255, 255, 0.9)'} !important;
+          color: rgba(255, 255, 255, 0.9) !important;
           padding: 0.6rem 1rem !important;
           margin: 0.2rem;
           border-radius: 8px;
@@ -172,14 +177,14 @@ function Navigation() {
         }
 
         .nav-link-custom:hover {
-          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
-          background-color: ${scrolled ? 'var(--mc-primary-50)' : 'rgba(255, 255, 255, 0.15)'};
+          color: white !important;
+          background-color: rgba(255, 255, 255, 0.15);
           transform: translateY(-2px);
         }
 
         .nav-link-custom.active {
-          color: ${scrolled ? 'var(--mc-primary-600)' : 'white'} !important;
-          background-color: ${scrolled ? 'var(--mc-primary-100)' : 'rgba(255, 255, 255, 0.25)'};
+          color: white !important;
+          background-color: rgba(255, 255, 255, 0.25);
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
@@ -191,7 +196,7 @@ function Navigation() {
           transform: translateX(-50%);
           width: 30px;
           height: 3px;
-          background: ${scrolled ? 'var(--mc-primary-600)' : 'white'};
+          background: white;
           border-radius: 2px;
         }
 
@@ -222,8 +227,16 @@ function Navigation() {
         }
 
         @media (max-width: 991px) {
+          .navbar-dark-bg {
+            background: #4f46e5 !important;
+            border-radius: 0 0 var(--mc-radius-lg) var(--mc-radius-lg);
+            padding: 0.5rem;
+            margin-top: 0.5rem;
+          }
+
           .nav-link-custom {
             margin: 0.3rem 0;
+            color: rgba(255, 255, 255, 0.9) !important;
           }
         }
       `}</style>

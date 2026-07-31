@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+frontend/node_modules
 /.pnp
 .pnp.js
 
@@ -22,10 +23,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-
 node_modules/
+frontend/node_modules/
 build/
 .env
 
+backend1/.venv/
 __pycache__/
 *.py[cod]
+frontend/node_modules/

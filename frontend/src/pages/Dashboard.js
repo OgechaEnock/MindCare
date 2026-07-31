@@ -233,7 +233,6 @@ function Dashboard() {
                     now={healthScore} 
                     label={`${healthScore}%`} 
                     className="mb-2 mc-health-progress"
-                    style={{ height: '25px' }}
                   />
                   <p className="mb-0 small">
                     {healthScore === 100 

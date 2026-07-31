@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner, Tab, Tabs } from 'react-bootstrap';
+import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner } from 'react-bootstrap';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
@@ -236,28 +236,28 @@ export default function Forum() {
         </div>
       </Alert>
 
-      {/* Category Tabs */}
-      <Tabs
-        activeKey={activeCategory}
-        onSelect={(k) => setActiveCategory(k)}
-        className="mb-4 border-0"
-        style={{
-          '--bs-nav-tabs-border-width': '0',
-          '--bs-nav-tabs-link-hover-border-color': 'transparent',
-        }}
-      >
+      {/* Category Filter Pills */}
+      <div className="d-flex flex-wrap gap-2 mb-4">
         {categories.map((cat) => (
-          <Tab 
-            key={cat.value} 
-            eventKey={cat.value} 
-            title={
-              <span className="rounded-pill px-3 py-2">
-                {cat.label}
-              </span>
-            }
-          />
+          <button
+            key={cat.value}
+            onClick={() => setActiveCategory(cat.value)}
+            className="rounded-pill px-3 py-2 category-filter-btn"
+            style={{
+              fontWeight: 500,
+              fontSize: '0.9rem',
+              transition: 'all var(--mc-transition-fast)',
+              border: activeCategory === cat.value ? '2px solid #4f46e5' : '2px solid #d1d5db',
+              background: activeCategory === cat.value ? '#4f46e5' : '#ffffff',
+              color: activeCategory === cat.value ? '#ffffff' : '#374151',
+              cursor: 'pointer',
+              boxShadow: activeCategory === cat.value ? '0 2px 8px rgba(79, 70, 229, 0.3)' : 'none',
+            }}
+          >
+            {cat.label}
+          </button>
         ))}
-      </Tabs>
+      </div>
 
       {threads.length === 0 ? (
         <Card className="mc-empty-state border-0 shadow-sm" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
@@ -546,31 +546,6 @@ export default function Forum() {
         </Modal.Footer>
       </Modal>
 
-      {/* Styling for Tabs */}
-      <style>{`
-        .nav-tabs .nav-link {
-          border: none !important;
-          background: var(--mc-bg-secondary);
-          color: var(--mc-text-secondary);
-          font-weight: 500;
-          transition: all var(--mc-transition-fast);
-        }
-
-        .nav-tabs .nav-link:hover {
-          background: var(--mc-primary-100);
-          color: var(--mc-primary-600);
-        }
-
-        .nav-tabs .nav-link.active {
-          background: var(--mc-bg-gradient) !important;
-          color: white !important;
-          box-shadow: var(--mc-shadow-md);
-        }
-
-        .nav-tabs {
-          border-bottom: none !important;
-        }
-      `}</style>
     </Container>
   );
 }

@@ -152,8 +152,8 @@ export default function Forum() {
     }
   };
 
-  const isAuthor = (post) => {
-    return post.user_id === user?.id;
+  const canDelete = (post) => {
+    return post.user_id === user?.id || user?.role === 'admin' || user?.role === 'manager';
   };
 
   const formatDate = (dateString) => {
@@ -317,7 +317,7 @@ export default function Forum() {
                         {formatDate(thread.created_at)}
                       </div>
                       <div className="d-flex align-items-center gap-2">
-                        {isAuthor(thread) && (
+                        {canDelete(thread) && (
                           <Button 
                             variant="outline-danger" 
                             size="sm"

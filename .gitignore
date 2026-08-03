@@ -33,4 +33,3 @@ __pycache__/
 *.py[cod]
 frontend/node_modules/
 backend1/mindcare.log
-backend1/.env.example

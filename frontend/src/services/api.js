@@ -9,7 +9,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor - Add auth token to requests
+// Request interceptor - add auth token to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
@@ -18,24 +18,110 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - Handle auth errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('authToken');
-      window.location.href = '/';
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
     }
+  });
+  failedQueue = [];
+};
+
+// Response interceptor - unwrap standardized envelope + refresh logic
+api.interceptors.response.use(
+  (response) => {
+    // Unwrap { success, message, data } envelope for success responses
+    if (response.data && typeof response.data === 'object' && response.data.success === true) {
+      const { data, message, ...rest } = response.data;
+      // If data is null/undefined, use rest (for cases like forum pending posts)
+      if (data !== null && data !== undefined) {
+        response.data = data;
+        // Preserve extra fields like 'warning' by merging into data if it's an object
+        if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+          const extraKeys = Object.keys(rest).filter(k => k !== 'message');
+          if (extraKeys.length > 0) {
+            response.data = { ...data, ...Object.fromEntries(extraKeys.map(k => [k, rest[k]])) };
+          }
+        }
+      } else {
+        // data is null — keep the full envelope (e.g., logout, mark-read)
+        response.data = rest;
+      }
+    }
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Handle 401 — try to refresh the access token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const authPaths = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'];
+      if (!authPaths.some(p => originalRequest.url.includes(p))) {
+        originalRequest._retry = true;
+
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({
+              resolve: (token) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(api(originalRequest));
+              },
+              reject,
+            });
+          });
+        }
+
+        isRefreshing = true;
+        const refreshToken = localStorage.getItem('refreshToken');
+
+        if (refreshToken) {
+          try {
+            const res = await axios.post(
+              `${API_BASE_URL}/api/auth/refresh`,
+              {},
+              { headers: { Authorization: `Bearer ${refreshToken}` } }
+            );
+            const newAccessToken = res.data.data?.access;
+            if (newAccessToken) {
+              localStorage.setItem('authToken', newAccessToken);
+              api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+              processQueue(null, newAccessToken);
+              return api(originalRequest);
+            }
+          } catch (refreshError) {
+            processQueue(refreshError, null);
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/';
+          }
+        } else {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/';
+        }
+        isRefreshing = false;
+      }
+    }
+
+    // Map 'message' to 'error' field for backward compatibility
+    if (error.response?.data && typeof error.response.data === 'object') {
+      if (!error.response.data.error && error.response.data.message) {
+        error.response.data.error = error.response.data.message;
+      }
+    }
+
     return Promise.reject(error);
   }
 );
-
 
 /**
  * Get all notifications for current user
@@ -111,7 +197,7 @@ export const deleteNotification = async (notificationId) => {
 
 /**
  * Get pending appointment reminders
- * @returns {Promise} Object with reminders_24h and reminders_1h arrays
+ * @returns {Promise} Array of pending reminders
  */
 export const getPendingReminders = async () => {
   try {
@@ -139,7 +225,7 @@ export const markReminderAsSent = async (appointmentId, type) => {
   }
 };
 
-// Export notification methods 
+// Export notification methods
 export const notificationAPI = {
   getNotifications,
   getUnreadCount,

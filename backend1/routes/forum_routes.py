@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from flask_jwt_extended import get_jwt
 
 from db import query
@@ -243,7 +243,7 @@ def create_thread():
 @limiter.limit("300 per minute")
 @login_required
 def delete_thread(thread_id):
-    user_id = g_user_id()
+    user_id = int(g_user_id())
 
     post_rows = query(
         "SELECT title, user_id FROM forum_threads WHERE id = %s",
@@ -252,20 +252,28 @@ def delete_thread(thread_id):
     if not post_rows:
         return error_response("Post not found", status=404)
 
-    # IDOR protection: only the author can delete
-    if post_rows[0]["user_id"] != user_id:
+    # IDOR protection: only the author OR admin/manager can delete
+    user_role = g.user_role  # populated by login_required decorator
+    if post_rows[0]["user_id"] != user_id and user_role not in ("admin", "manager"):
         logger.warning(
             "IDOR attempt — user tried to delete another user's thread",
-            extra={"user_id": user_id, "thread_id": thread_id},
+            extra={"user_id": user_id, "thread_id": thread_id, "user_role": user_role},
         )
         return error_response("You are not authorized to delete this post", status=403)
 
     title = decrypt(post_rows[0]["title"]) if post_rows[0]["title"] else ""
 
-    delete_rows = query(
-        "DELETE FROM forum_threads WHERE id = %s AND user_id = %s RETURNING id",
-        (thread_id, user_id),
-    )
+    # Admin/manager can delete any post; author can only delete their own
+    if user_role in ("admin", "manager"):
+        delete_rows = query(
+            "DELETE FROM forum_threads WHERE id = %s RETURNING id",
+            (thread_id,),
+        )
+    else:
+        delete_rows = query(
+            "DELETE FROM forum_threads WHERE id = %s AND user_id = %s RETURNING id",
+            (thread_id, user_id),
+        )
     if not delete_rows:
         return error_response("Failed to delete post", status=500)
 

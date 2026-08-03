@@ -1,6 +1,8 @@
+-- MindCare PostgreSQL Schema — Security-Hardened
 -- Run this in PostgreSQL
 
--- Drop existing tables if needed
+-- ─── Drop existing tables (fresh start) ─────────────────────────────────
+DROP TABLE IF EXISTS token_blocklist CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS forum_threads CASCADE;
 DROP TABLE IF EXISTS appointments CASCADE;
@@ -8,46 +10,63 @@ DROP TABLE IF EXISTS medications CASCADE;
 DROP TABLE IF EXISTS medical_history CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- Enable UUID extension
+-- ─── Extensions ─────────────────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
+-- ─── Users table (with RBAC roles + token blocklist) ─────────────────────
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    role VARCHAR(20) NOT NULL DEFAULT 'user'
+        CHECK (role IN ('admin', 'manager', 'user')),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Medical History table
+-- ─── Token blocklist (JWT revocation) ───────────────────────────────────
+CREATE TABLE token_blocklist (
+    id SERIAL PRIMARY KEY,
+    jti VARCHAR(36) NOT NULL UNIQUE,
+    token_type VARCHAR(20) NOT NULL,   -- 'access' | 'refresh'
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+);
+CREATE INDEX idx_token_blocklist_jti ON token_blocklist(jti);
+CREATE INDEX idx_token_blocklist_expires ON token_blocklist(expires_at);
+
+-- ─── Medical History table (encrypted fields) ───────────────────────────
 CREATE TABLE medical_history (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     diagnosis TEXT,
     conditions TEXT,
     allergies TEXT,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_medical_history_user ON medical_history(user_id);
 
--- Medications table
+-- ─── Medications table (encrypted fields) ─────────────────────────────
 CREATE TABLE medications (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     dosage TEXT,
     frequency TEXT,
     reminder_enabled BOOLEAN DEFAULT false,
     reminder_times TEXT[] DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_medications_user ON medications(user_id);
 
--- Appointments table
+-- ─── Appointments table (encrypted fields) ───────────────────────────
 CREATE TABLE appointments (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     appointment_date DATE NOT NULL,
     appointment_time TIME NOT NULL,
@@ -56,45 +75,50 @@ CREATE TABLE appointments (
     reminder_1h BOOLEAN DEFAULT true,
     notified_24h BOOLEAN DEFAULT false,
     notified_1h BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_appointments_user ON appointments(user_id);
+CREATE INDEX idx_appointments_date ON appointments(appointment_date);
 
--- Forum threads table (with moderation)
+-- ─── Forum threads table (with AI moderation) ──────────────────────────
 CREATE TABLE forum_threads (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
-    category VARCHAR(100) DEFAULT 'general',
+    category VARCHAR(100) DEFAULT 'general'
+        CHECK (category IN ('general', 'support', 'resources', 'success', 'questions')),
     author_name VARCHAR(255),
-    approval_status VARCHAR(50) DEFAULT 'approved',
+    approval_status VARCHAR(50) DEFAULT 'approved'
+        CHECK (approval_status IN ('approved', 'pending', 'rejected')),
     moderation_notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_forum_threads_user ON forum_threads(user_id);
+CREATE INDEX idx_forum_threads_approved ON forum_threads(approval_status);
+CREATE INDEX idx_forum_threads_category ON forum_threads(category);
 
--- Notifications table
+-- ─── Notifications table ───────────────────────────────────────────────
 CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type VARCHAR(100) NOT NULL DEFAULT 'general',
     title VARCHAR(255),
     message TEXT,
     related_id INTEGER,
     is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
--- Create indexes for better performance
-CREATE INDEX idx_medications_user ON medications(user_id);
-CREATE INDEX idx_appointments_user ON appointments(user_id);
-CREATE INDEX idx_forum_threads_user ON forum_threads(user_id);
-CREATE INDEX idx_forum_threads_approved ON forum_threads(approval_status);
 CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, is_read);
 
-COMMENT ON TABLE users IS 'Stores user authentication information';
-COMMENT ON TABLE medications IS 'Stores encrypted medication data with reminder settings';
-COMMENT ON TABLE appointments IS 'Stores encrypted appointment data with reminder tracking';
-COMMENT ON TABLE forum_threads IS 'Stores forum threads with AI moderation status';
+-- ─── Column comments ───────────────────────────────────────────────────
+COMMENT ON TABLE users IS 'Stores user authentication info (bcrypt-hashed passwords, RBAC roles)';
+COMMENT ON COLUMN users.password IS 'bcrypt hash — never plaintext';
+COMMENT ON COLUMN users.role IS 'RBAC role: admin | manager | user';
+COMMENT ON TABLE token_blocklist IS 'JWT token revocation list (jti-based)';
+COMMENT ON TABLE medications IS 'Stores AES-encrypted medication data';
+COMMENT ON TABLE appointments IS 'Stores AES-encrypted appointment data';
+COMMENT ON TABLE forum_threads IS 'Stores AES-encrypted forum posts with AI moderation status';
 COMMENT ON TABLE notifications IS 'Stores in-app notifications for users';

@@ -1,135 +1,153 @@
 """
-Equivalent to routes/medicationRoutes.js
+Medication routes — JWT-authenticated, Marshmallow-validated, rate-limited.
+
+Endpoints:
+  GET  /api/medications                     – list (300/min/user, paginated)
+  POST /api/medications                     – create (300/min/user)
+  PUT  /api/medications/<id>/reminders      – update reminders (300/min/user)
+  DELETE /api/medications/<id>             – delete (300/min/user)
 """
-from flask import Blueprint, g, jsonify, request
+from __future__ import annotations
+
+from flask import g, request
+from flask_jwt_extended import get_jwt
 
 from db import query
-from middleware.auth import authenticate_token
+from extensions import limiter
+from middleware.decorators import login_required
+from schemas import MedicationCreateSchema, MedicationReminderSchema, PaginationSchema, validate_query, validate_request
 from utils.encrypt import decrypt, encrypt
+from utils.logger import get_logger
+from utils.responses import error_response, success_response
 
-medication_bp = Blueprint("medications", __name__, url_prefix="/api/medications")
+medication_bp = __import__("flask").Blueprint("medications", __name__, url_prefix="/api/medications")
+logger = get_logger(__name__)
+
+_MAX_MEDS = 100
+
+
+def _iso(value):
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
 
 
 @medication_bp.post("")
-@authenticate_token
+@limiter.limit("300 per minute")
+@validate_request(MedicationCreateSchema)
+@login_required
 def add_medication():
-    try:
-        data = request.get_json(silent=True) or {}
-        name = data.get("name")
-        dosage = data.get("dosage")
-        frequency = data.get("frequency")
-        reminder_enabled = data.get("reminderEnabled", False)
-        reminder_times = data.get("reminderTimes", [])
-        user_id = g.user["id"]
+    data = request.validated
+    user_id = g.user_id
 
-        if not name or not dosage or not frequency:
-            return jsonify({"error": "All fields are required"}), 400
+    enc_name = encrypt(data["name"])
+    enc_dosage = encrypt(data["dosage"])
+    enc_frequency = encrypt(data["frequency"])
+    reminder_times = data.get("reminder_times", [])
 
-        enc_name = encrypt(name)
-        enc_dosage = encrypt(dosage)
-        enc_frequency = encrypt(frequency)
+    rows = query(
+        """INSERT INTO medications
+           (user_id, name, dosage, frequency, reminder_enabled, reminder_times, created_at)
+           VALUES (%s, %s, %s, %s, %s, %s, NOW())
+           RETURNING id, created_at""",
+        (user_id, enc_name, enc_dosage, enc_frequency,
+         data.get("reminder_enabled", False), reminder_times),
+    )
 
-        rows = query(
-            """INSERT INTO medications (user_id, name, dosage, frequency, reminder_enabled, reminder_times, created_at)
-               VALUES (%s, %s, %s, %s, %s, %s, NOW())
-               RETURNING id, created_at""",
-            (user_id, enc_name, enc_dosage, enc_frequency, bool(reminder_enabled), reminder_times or []),
-        )
-
-        return jsonify({
-            "message": "Medication added successfully",
-            "medication": {
-                "id": rows[0]["id"],
-                "name": name,
-                "dosage": dosage,
-                "frequency": frequency,
-                "reminder_enabled": bool(reminder_enabled),
-                "reminder_times": reminder_times or [],
-                "created_at": rows[0]["created_at"],
-            },
-        }), 201
-
-    except Exception as err:
-        print(f"Add medication error: {err}")
-        return jsonify({"error": "Failed to add medication"}), 500
+    result = {
+        "id": rows[0]["id"],
+        "name": data["name"],
+        "dosage": data["dosage"],
+        "frequency": data["frequency"],
+        "reminder_enabled": data.get("reminder_enabled", False),
+        "reminder_times": reminder_times,
+        "created_at": _iso(rows[0]["created_at"]),
+    }
+    logger.info("Medication created", extra={"user_id": user_id, "med_id": rows[0]["id"]})
+    return success_response(data=result, message="Medication added successfully", status=201)
 
 
 @medication_bp.get("")
-@authenticate_token
+@limiter.limit("300 per minute")
+@validate_query(PaginationSchema)
+@login_required
 def get_medications():
-    try:
-        user_id = g.user["id"]
+    p = request.validated_query
+    page = p["page"]
+    limit = min(p["limit"], _MAX_MEDS)
+    offset = (page - 1) * limit
+    user_id = g.user_id
 
-        rows = query(
-            """SELECT id, name, dosage, frequency, reminder_enabled, reminder_times, created_at
-               FROM medications WHERE user_id=%s ORDER BY created_at DESC""",
-            (user_id,),
-        )
+    rows = query(
+        """SELECT id, name, dosage, frequency, reminder_enabled, reminder_times, created_at
+           FROM medications WHERE user_id = %s
+           ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+        (user_id, limit, offset),
+    )
 
-        decrypted = [
-            {
-                "id": row["id"],
-                "name": decrypt(row["name"]),
-                "dosage": decrypt(row["dosage"]),
-                "frequency": decrypt(row["frequency"]),
-                "reminder_enabled": row["reminder_enabled"],
-                "reminder_times": row["reminder_times"] or [],
-                "created_at": row["created_at"],
-            }
-            for row in rows
-        ]
+    total_rows = query(
+        "SELECT COUNT(*) as c FROM medications WHERE user_id = %s",
+        (user_id,),
+    )
+    total = int(total_rows[0]["c"]) if total_rows else 0
 
-        return jsonify(decrypted)
-    except Exception as err:
-        print(f"Fetch medications error: {err}")
-        return jsonify({"error": "Failed to fetch medications"}), 500
+    decrypted = [
+        {
+            "id": row["id"],
+            "name": decrypt(row["name"]),
+            "dosage": decrypt(row["dosage"]),
+            "frequency": decrypt(row["frequency"]),
+            "reminder_enabled": row["reminder_enabled"],
+            "reminder_times": row["reminder_times"] or [],
+            "created_at": _iso(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+    resp = success_response(data=decrypted, message="Medications retrieved")
+    resp[0].headers["X-Page"] = str(page)
+    resp[0].headers["X-Total-Pages"] = str(-(-total // limit)) if limit else "1"
+    resp[0].headers["X-Total-Count"] = str(total)
+    return resp
 
 
 @medication_bp.put("/<int:med_id>/reminders")
-@authenticate_token
+@limiter.limit("300 per minute")
+@validate_request(MedicationReminderSchema)
+@login_required
 def update_medication_reminders(med_id):
-    try:
-        data = request.get_json(silent=True) or {}
-        reminder_enabled = data.get("reminderEnabled")
-        reminder_times = data.get("reminderTimes")
-        user_id = g.user["id"]
+    data = request.validated
+    user_id = g.user_id
 
-        rows = query(
-            """UPDATE medications
-               SET reminder_enabled = %s, reminder_times = %s
-               WHERE id = %s AND user_id = %s
-               RETURNING id""",
-            (reminder_enabled, reminder_times, med_id, user_id),
-        )
+    rows = query(
+        """UPDATE medications
+           SET reminder_enabled = %s, reminder_times = %s
+           WHERE id = %s AND user_id = %s
+           RETURNING id, reminder_enabled, reminder_times""",
+        (data.get("reminder_enabled"), data.get("reminder_times", []), med_id, user_id),
+    )
+    if not rows:
+        return error_response("Medication not found", status=404)
 
-        if len(rows) == 0:
-            return jsonify({"error": "Medication not found"}), 404
-
-        return jsonify({
-            "message": "Reminder settings updated successfully",
-            "reminder_enabled": reminder_enabled,
-            "reminder_times": reminder_times,
-        })
-    except Exception as err:
-        print(f"Update reminder error: {err}")
-        return jsonify({"error": "Failed to update reminder settings"}), 500
+    return success_response(
+        data={
+            "reminder_enabled": rows[0]["reminder_enabled"],
+            "reminder_times": rows[0]["reminder_times"] or [],
+        },
+        message="Reminder settings updated successfully",
+    )
 
 
 @medication_bp.delete("/<int:med_id>")
-@authenticate_token
+@limiter.limit("300 per minute")
+@login_required
 def delete_medication(med_id):
-    try:
-        user_id = g.user["id"]
-
-        rows = query(
-            "DELETE FROM medications WHERE id=%s AND user_id=%s RETURNING id",
-            (med_id, user_id),
-        )
-
-        if len(rows) == 0:
-            return jsonify({"error": "Medication not found"}), 404
-
-        return jsonify({"message": "Medication deleted successfully"})
-    except Exception as err:
-        print(f"Delete medication error: {err}")
-        return jsonify({"error": "Failed to delete medication"}), 500
+    rows = query(
+        "DELETE FROM medications WHERE id = %s AND user_id = %s RETURNING id",
+        (med_id, g.user_id),
+    )
+    if not rows:
+        return error_response("Medication not found", status=404)
+    return success_response(message="Medication deleted successfully")

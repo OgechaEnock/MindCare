@@ -1,81 +1,137 @@
 """
-Equivalent to middleware/authMiddleware.js
-"""
-import re
-from datetime import timedelta
-from functools import wraps
+Authentication middleware built on Flask-JWT-Extended.
 
-import jwt
-from flask import g, jsonify, request
+Replaces the previous hand-rolled PyJWT / authenticate_token approach
+with a production-grade JWT implementation providing:
+  * Short-lived access tokens (15 min)
+  * Long-lived refresh tokens (7 days)
+  * Token revocation via DB blocklist (logout works)
+  * Role-based claims in every token
+"""
+from __future__ import annotations
+
+import datetime as _dt
+
+import bcrypt
+from flask import g
+from flask_jwt_extended import (
+    create_access_token, create_refresh_token, decode_token,
+    get_jwt, get_jwt_identity, jwt_required,
+)
 
 from config import config
+from db import query, revoke_token as _revoke_token
+from extensions import jwt
+from utils.responses import error_response
 
-JWT_SECRET = config.JWT_SECRET
-
-_UNIT_TO_KWARG = {
-    "s": "seconds",
-    "m": "minutes",
-    "h": "hours",
-    "d": "days",
-    "w": "weeks",
-}
+logger = __import__("utils.logger", fromlist=["get_logger"]).get_logger(__name__)
 
 
-def parse_expires_in(value) -> timedelta:
-    """
-    Parses strings like '7d', '24h', '3600s', '15m' (as used by
-    jsonwebtoken's `expiresIn` option) into a timedelta. Falls back to
-    treating a bare number as seconds.
-    """
-    if isinstance(value, (int, float)):
-        return timedelta(seconds=value)
+def init_jwt(app):
+    """Register Flask-JWT-Extended callbacks on the Flask app."""
+    jwt.init_app(app)
 
-    match = re.fullmatch(r"(\d+)\s*([smhdw])?", str(value).strip())
-    if not match:
-        # Sensible default if the env var is malformed
-        return timedelta(days=7)
-
-    amount, unit = match.groups()
-    kwarg = _UNIT_TO_KWARG.get(unit or "s", "seconds")
-    return timedelta(**{kwarg: int(amount)})
-
-
-def generate_token(payload: dict) -> str:
-    exp = parse_expires_in(config.JWT_EXPIRES_IN)
-    to_encode = {**payload}
-    to_encode_exp = jwt.encode(
-        {**to_encode, "exp": _now_plus(exp)},
-        JWT_SECRET,
-        algorithm="HS256",
-    )
-    return to_encode_exp
-
-
-def _now_plus(delta: timedelta):
-    from datetime import datetime, timezone
-    return datetime.now(tz=timezone.utc) + delta
-
-
-def authenticate_token(f):
-    """Decorator that verifies the JWT and attaches the decoded user to g.user."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get("Authorization", "")
-        parts = auth_header.split(" ")
-        token = parts[1] if len(parts) == 2 else None
-
-        if not token:
-            return jsonify({"error": "Access denied. No token provided."}), 401
-
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(_jwt_header, jwt_payload):
+        jti = jwt_payload.get("jti", "")
+        if not jti:
+            return True  # fail-safe
         try:
-            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token has expired. Please login again."}), 401
-        except jwt.InvalidTokenError as err:
-            print(f"Token verification error: {err}")
-            return jsonify({"error": "Invalid token."}), 403
+            result = query(
+                "SELECT 1 FROM token_blocklist WHERE jti = %s AND expires_at > NOW() LIMIT 1",
+                (jti,),
+            )
+            return len(result) > 0
+        except Exception as exc:
+            # Table missing (pre-migration DB) or DB hiccup — fail OPEN so
+            # existing sessions are not logged out by revocation check errors.
+            logger.warning(
+                "Token blocklist check failed — failing open",
+                extra={"error_type": type(exc).__name__, "jti": jti[:8]},
+            )
+            return False
 
-        g.user = decoded
-        return f(*args, **kwargs)
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return error_response(
+            "The token has expired. Please use the refresh endpoint.",
+            status=401,
+        )
 
-    return decorated
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error_string):
+        return error_response("The token is invalid. Please log in again.", status=401)
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error_string):
+        return error_response("A valid access token is required.", status=401)
+
+    @jwt.revoked_token_loader
+    def revoked_token_callback(jwt_header, jwt_payload):
+        return error_response("The token has been revoked. Please log in again.", status=401)
+
+
+# ─── Password helpers ────────────────────────────────────────────────────
+
+
+def hash_password(password: str) -> str:
+    """Hash *password* with bcrypt using the configured work factor."""
+    rounds = getattr(config, "BCRYPT_ROUNDS", 12)
+    return bcrypt.hashpw(
+        password.encode("utf-8"), bcrypt.gensalt(rounds)
+    ).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Return True if *password* matches the bcrypt *hashed* value."""
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+
+
+# ─── Token creation ──────────────────────────────────────────────────────
+
+
+def create_tokens(user_row: dict) -> dict:
+    """
+    Create access + refresh JWT tokens for a user database row.
+
+    Claims: sub (user id), id, email, name, role — keeping the frontend's
+    jwt_decode expectations intact.
+    """
+    user_id = user_row["id"]
+    additional_claims = {
+        "id": user_id,
+        "email": user_row.get("email", ""),
+        "name": user_row.get("name", ""),
+        "role": user_row.get("role", "user"),
+    }
+    # Flask-JWT-Extended 4.x requires the subject (identity) to be a STRING.
+    # Passing an int causes InvalidSubjectError on verification → 401 on
+    # every authenticated request. Convert to str; DB queries cast it back.
+    access = create_access_token(identity=str(user_id), additional_claims=additional_claims)
+    refresh = create_refresh_token(identity=str(user_id), additional_claims=additional_claims)
+    return {"access": access, "refresh": refresh}
+
+
+def revoke_current_token():
+    """Add the *current* access token's JTI to the DB blocklist."""
+    claims = get_jwt()
+    jti = claims["jti"]
+    exp = claims.get("exp")
+    token_type = claims.get("type", "access")
+    expires_at = _dt.datetime.fromtimestamp(exp, tz=_dt.timezone.utc) if exp else None
+    _revoke_token(jti, token_type, expires_at)
+
+
+def revoke_refresh_token(refresh_token_str: str):
+    """Decode and revoke a refresh-token string."""
+    try:
+        decoded = decode_token(refresh_token_str)
+        jti = decoded["jti"]
+        exp = decoded.get("exp")
+        expires_at = _dt.datetime.fromtimestamp(exp, tz=_dt.timezone.utc) if exp else None
+        _revoke_token(jti, "refresh", expires_at)
+    except Exception:
+        pass

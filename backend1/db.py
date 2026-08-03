@@ -1,60 +1,80 @@
 """
-PostgreSQL connection pool + query helper.
-Equivalent to config/db.js (node-postgres Pool).
+PostgreSQL connection pool + parameterized query helper.
+
+Keeps the existing psycopg2 ``ThreadedConnectionPool`` layer (already
+SQL-injection-safe via ``%s`` placeholders) but adds structured logging
+and token-blocklist helpers used by Flask-JWT-Extended's revocation flow.
 """
-import psycopg2
-from psycopg2 import pool as pg_pool
+from __future__ import annotations
+
+import threading
+from datetime import datetime, timezone
+from typing import Any, Sequence
+
+import psycopg2.pool as pg_pool
 from psycopg2.extras import RealDictCursor
 
 from config import config
+from utils.logger import get_logger
 
-_pool = None
+logger = get_logger(__name__)
+
+_pool: pg_pool.ThreadedConnectionPool | None = None
+_lock = threading.Lock()
 
 
-def init_pool():
+def init_pool() -> pg_pool.ThreadedConnectionPool:
+    """Initialize the global connection pool (thread-safe singleton)."""
     global _pool
     if _pool is not None:
         return _pool
-    try:
-        _pool = pg_pool.ThreadedConnectionPool(
-            minconn=1,
-            maxconn=10,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            host=config.DB_HOST,
-            port=config.DB_PORT,
-            dbname=config.DB_NAME,
-        )
-        # Sanity check the connection, same as the Node version's pool.connect() check
-        conn = _pool.getconn()
-        _pool.putconn(conn)
-        print("Connected to PostgreSQL database successfully!")
-    except Exception as err:
-        print(f"Database connection failed: {err}")
-        raise
+    with _lock:
+        if _pool is not None:
+            return _pool
+        try:
+            _pool = pg_pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=20,
+                user=config.DB_USER,
+                password=config.DB_PASSWORD,
+                host=config.DB_HOST,
+                port=config.DB_PORT,
+                dbname=config.DB_NAME,
+            )
+            # Sanity-check the connection
+            conn = _pool.getconn()
+            _pool.putconn(conn)
+            logger.info("PostgreSQL connection pool initialized")
+        except Exception as err:
+            logger.error("Database connection failed", extra={"error": str(err)})
+            raise
     return _pool
 
 
-def get_pool():
+def get_pool() -> pg_pool.ThreadedConnectionPool:
+    """Return the pool, initializing it lazily if needed."""
     if _pool is None:
         return init_pool()
     return _pool
 
 
-def query(sql, params=None):
+def query(sql: str, params: Sequence[Any] | None = None) -> list[dict]:
     """
-    Runs a query and returns a list of dict rows, mirroring result.rows
-    from node-postgres. Works for SELECT as well as INSERT/UPDATE/DELETE
-    ... RETURNING statements.
+    Execute a **parameterized** SQL statement and return results as a list of
+    dicts (mirroring ``node-postgres`` ``result.rows``).
+
+    All caller-supplied values MUST be passed via *params* — never string-
+    formatted into *sql*.  This is the single choke-point for SQL injection
+    prevention.
     """
-    p = get_pool()
-    conn = p.getconn()
+    pool = get_pool()
+    conn = pool.getconn()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, params or ())
-            if cur.description:  # query returned rows (SELECT or RETURNING)
+            if cur.description:  # SELECT / RETURNING
                 rows = cur.fetchall()
-            else:
+            else:                # INSERT / UPDATE / DELETE without RETURNING
                 rows = []
             conn.commit()
             return rows
@@ -62,4 +82,25 @@ def query(sql, params=None):
         conn.rollback()
         raise
     finally:
-        p.putconn(conn)
+        pool.putconn(conn)
+
+
+# ─── Token blocklist helpers (used by Flask-JWT-Extended revocation) ───
+
+def is_token_revoked(jti: str) -> bool:
+    """Return *True* if *jti* is in the active blocklist."""
+    rows = query(
+        "SELECT 1 FROM token_blocklist WHERE jti = %s AND expires_at > NOW() LIMIT 1",
+        (jti,),
+    )
+    return len(rows) > 0
+
+
+def revoke_token(jti: str, token_type: str, expires_at: datetime | None) -> None:
+    """Add a token's JTI to the blocklist so it can no longer be used."""
+    query(
+        "INSERT INTO token_blocklist (jti, token_type, expires_at, created_at) "
+        "VALUES (%s, %s, %s, NOW())",
+        (jti, token_type, expires_at),
+    )
+    logger.info("Token revoked", extra={"token_type": token_type})

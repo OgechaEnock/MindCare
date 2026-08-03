@@ -1,56 +1,75 @@
 """
-Equivalent to services/notificationService.js
+Notification service — structured logging, parameterized queries.
 """
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 
 from db import query
 from utils.encrypt import decrypt
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
-def create_notification(user_id, notif_type, message, related_id=None):
+def create_notification(user_id, notif_type, message, related_id=None, title=None):
     try:
         query(
-            """INSERT INTO notifications (user_id, type, message, related_id, created_at)
-               VALUES (%s, %s, %s, %s, NOW())""",
-            (user_id, notif_type, message, related_id),
+            """INSERT INTO notifications
+               (user_id, type, title, message, related_id, created_at)
+               VALUES (%s, %s, %s, %s, %s, NOW())""",
+            (user_id, notif_type, title or message, message, related_id),
         )
-        print(f"Notification created for user {user_id}: {notif_type}")
+        logger.info(
+            "Notification created",
+            extra={"user_id": user_id, "type": notif_type, "related_id": related_id},
+        )
     except Exception as error:
-        print(f"Error creating notification: {error}")
+        logger.error(
+            "Failed to create notification",
+            extra={"user_id": user_id, "error": str(error)},
+        )
 
 
-def get_user_notifications(user_id):
+def get_user_notifications(user_id, limit=50, offset=0):
+    """Return paginated notifications for user_id."""
     try:
         return query(
-            """SELECT * FROM notifications
+            """SELECT id, type, title, message, related_id, is_read, created_at
+               FROM notifications
                WHERE user_id = %s
                ORDER BY created_at DESC
-               LIMIT 50""",
-            (user_id,),
+               LIMIT %s OFFSET %s""",
+            (user_id, limit, offset),
         )
     except Exception as error:
-        print(f"Error fetching notifications: {error}")
+        logger.error("Failed to fetch notifications", extra={"user_id": user_id, "error": str(error)})
         return []
 
 
 def mark_notification_as_read(notification_id, user_id):
     try:
         query(
-            """UPDATE notifications
-               SET is_read = true
+            """UPDATE notifications SET is_read = true
                WHERE id = %s AND user_id = %s""",
             (notification_id, user_id),
         )
+        logger.info(
+            "Notification marked as read",
+            extra={"user_id": user_id, "notification_id": notification_id},
+        )
     except Exception as error:
-        print(f"Error marking notification as read: {error}")
+        logger.error(
+            "Failed to mark notification as read",
+            extra={"user_id": user_id, "notification_id": notification_id, "error": str(error)},
+        )
 
 
 def check_medication_reminders():
     try:
         now = datetime.now()
         current_time = now.strftime("%H:%M")
-
-        print(f"Checking medication reminders at {current_time}...")
+        logger.info("Checking medication reminders", extra={"current_time": current_time})
 
         rows = query(
             """SELECT m.id, m.user_id, m.name, m.dosage, m.reminder_times
@@ -63,26 +82,25 @@ def check_medication_reminders():
         for med in rows:
             reminder_times = med.get("reminder_times") or []
             if current_time in reminder_times:
-                med_name = decrypt(med["name"])
-                med_dosage = decrypt(med["dosage"])
-
+                med_name = decrypt(med["name"]) if med["name"] else ""
+                med_dosage = decrypt(med["dosage"]) if med["dosage"] else ""
                 create_notification(
                     med["user_id"],
                     "medication_reminder",
                     f"Time to take {med_name} ({med_dosage})",
                     med["id"],
                 )
-                print(f"Sent medication reminder: {med_name} to user {med['user_id']}")
+                logger.info("Medication reminder sent",
+                    extra={"user_id": med["user_id"], "med_id": med["id"]})
     except Exception as error:
-        print(f"Error checking medication reminders: {error}")
+        logger.error("Error checking medication reminders", extra={"error": str(error)})
 
 
 def check_appointment_reminders():
     try:
         now = datetime.now()
-        print(f"Checking appointment reminders at {now.isoformat()}...")
+        logger.info("Checking appointment reminders", extra={"time": now.isoformat()})
 
-        # 24-hour reminders
         tomorrow = now + timedelta(hours=24)
         tomorrow_date = tomorrow.date()
         tomorrow_hour = tomorrow.hour
@@ -98,20 +116,15 @@ def check_appointment_reminders():
         )
 
         for apt in result_24h:
-            title = decrypt(apt["title"])
-            date_str = apt["appointment_date"].strftime("%m/%d/%Y") if apt["appointment_date"] else ""
-
+            title = decrypt(apt["title"]) if apt["title"] else ""
+            date_str = apt["appointment_date"].strftime("%m/%d/%Y") if apt.get("appointment_date") else ""
             create_notification(
-                apt["user_id"],
-                "appointment_reminder",
-                f"{title} on {date_str} at {apt['appointment_time']}",
-                apt["id"],
+                apt["user_id"], "appointment_reminder",
+                f"{title} on {date_str} at {apt['appointment_time']}", apt["id"],
             )
-
             query("UPDATE appointments SET notified_24h = true WHERE id = %s", (apt["id"],))
-            print(f"Sent 24h appointment reminder: {title} to user {apt['user_id']}")
+            logger.info("24h reminder sent", extra={"user_id": apt["user_id"], "apt_id": apt["id"]})
 
-        # 1-hour reminders
         one_hour_later = now + timedelta(hours=1)
         one_hour_date = one_hour_later.date()
         one_hour_time = one_hour_later.strftime("%H:%M")
@@ -127,16 +140,13 @@ def check_appointment_reminders():
         )
 
         for apt in result_1h:
-            title = decrypt(apt["title"])
-
+            title = decrypt(apt["title"]) if apt["title"] else ""
             create_notification(
-                apt["user_id"],
-                "appointment_reminder",
-                f"{title} at {apt['appointment_time']}",
-                apt["id"],
+                apt["user_id"], "appointment_reminder",
+                f"{title} at {apt['appointment_time']}", apt["id"],
             )
-
             query("UPDATE appointments SET notified_1h = true WHERE id = %s", (apt["id"],))
-            print(f"Sent 1h appointment reminder: {title} to user {apt['user_id']}")
+            logger.info("1h reminder sent", extra={"user_id": apt["user_id"], "apt_id": apt["id"]})
+
     except Exception as error:
-        print(f"Error checking appointment reminders: {error}")
+        logger.error("Error checking appointment reminders", extra={"error": str(error)})

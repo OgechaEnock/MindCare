@@ -136,6 +136,14 @@ def update_profile():
 
     query(f"UPDATE users SET {set_clause} WHERE id = %s", tuple(values))
 
+    # If name was updated, sync it to forum posts
+    if 'name' in update_fields:
+        query(
+            "UPDATE forum_threads SET author_name = %s WHERE user_id = %s",
+            (update_fields['name'], user_id)
+        )
+        logger.info("Synced name change to forum posts", extra={"user_id": user_id})
+
     logger.info("Profile updated", extra={"user_id": user_id, "fields": list(update_fields.keys())})
 
     updated_rows = query(

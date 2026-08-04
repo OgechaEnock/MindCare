@@ -22,7 +22,7 @@ from middleware.auth import (
     create_tokens, hash_password, revoke_current_token, revoke_refresh_token,
     verify_password,
 )
-from schemas import LoginSchema, RegisterSchema, validate_request
+from schemas import LoginSchema, RegisterSchema, validate_request, _validate_password_complexity
 from utils.responses import error_response, success_response
 from utils.logger import get_logger
 
@@ -46,6 +46,12 @@ def register():
             extra={"email": data["email"]},
         )
         return error_response("Email already registered", status=409)
+
+    # Server-side password validation with detailed errors
+    try:
+        _validate_password_complexity(data["password"])
+    except Exception as e:
+        return error_response(str(e), status=400)
 
     hashed_pw = hash_password(data["password"])
     # role defaults to 'user' — never trust client-supplied role

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Form, Button, Container, Card } from "react-bootstrap";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -16,6 +16,7 @@ function Register() {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -23,6 +24,29 @@ function Register() {
       setErrors({ ...errors, [e.target.name]: null });
     }
   };
+
+  const validatePasswordRequirements = () => {
+    const reqs = {
+      length: form.password.length >= 8 && form.password.length <= 128,
+      uppercase: /[A-Z]/.test(form.password),
+      lowercase: /[a-z]/.test(form.password),
+      digit: /[0-9]/.test(form.password),
+      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~ ]/.test(form.password),
+    };
+    return reqs;
+  };
+
+  const passwordRequirements = validatePasswordRequirements();
+  const allRequirementsMet = Object.values(passwordRequirements).every(Boolean);
+
+  // Real-time password match validation
+  useEffect(() => {
+    if (form.confirmPassword && form.password !== form.confirmPassword) {
+      setErrors(prev => ({ ...prev, confirmPassword: "Passwords do not match" }));
+    } else if (form.confirmPassword) {
+      setErrors(prev => ({ ...prev, confirmPassword: null }));
+    }
+  }, [form.password, form.confirmPassword]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -36,8 +60,8 @@ function Register() {
       newErrors.email = "Please enter a valid email address";
     }
 
-    if (form.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    if (!allRequirementsMet) {
+      newErrors.password = "Password does not meet all requirements";
     }
 
     if (form.password !== form.confirmPassword) {
@@ -132,12 +156,14 @@ function Register() {
                 <Form.Control
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="At least 8 characters"
+                  placeholder="Create a strong password"
                   value={form.password}
                   onChange={handleChange}
                   required
                   minLength={8}
                   isInvalid={!!errors.password}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
                   className="mc-form-control pe-5"
                 />
                 <button
@@ -152,6 +178,35 @@ function Register() {
               <Form.Control.Feedback type="invalid">
                 {errors.password}
               </Form.Control.Feedback>
+
+              {/* Password Requirements Checklist */}
+              {passwordFocused && (
+                <div className="password-requirements mt-2 p-3 rounded" style={{ background: '#f8f9fa' }}>
+                  <small className="text-muted mb-2 d-block">Password must contain:</small>
+                  <div className="d-flex flex-column gap-1">
+                    <div className={`req-item ${passwordRequirements.length ? 'met' : 'unmet'}`}>
+                      <i className={`bi ${passwordRequirements.length ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                      <small>At least 8 characters (max 128)</small>
+                    </div>
+                    <div className={`req-item ${passwordRequirements.uppercase ? 'met' : 'unmet'}`}>
+                      <i className={`bi ${passwordRequirements.uppercase ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                      <small>One uppercase letter (A-Z)</small>
+                    </div>
+                    <div className={`req-item ${passwordRequirements.lowercase ? 'met' : 'unmet'}`}>
+                      <i className={`bi ${passwordRequirements.lowercase ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                      <small>One lowercase letter (a-z)</small>
+                    </div>
+                    <div className={`req-item ${passwordRequirements.digit ? 'met' : 'unmet'}`}>
+                      <i className={`bi ${passwordRequirements.digit ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                      <small>One digit (0-9)</small>
+                    </div>
+                    <div className={`req-item ${passwordRequirements.special ? 'met' : 'unmet'}`}>
+                      <i className={`bi ${passwordRequirements.special ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'}`}></i>
+                      <small>One special character (!@#$%^&*)</small>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Form.Group>
 
             <Form.Group className="mc-form-group" controlId="confirmPassword">
@@ -178,9 +233,12 @@ function Register() {
                   <i className={`bi ${showConfirmPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
                 </button>
               </div>
-              <Form.Control.Feedback type="invalid">
-                {errors.confirmPassword}
-              </Form.Control.Feedback>
+              {errors.confirmPassword && (
+                <div className="text-danger mt-1 small">
+                  <i className="bi bi-exclamation-circle me-1"></i>
+                  {errors.confirmPassword}
+                </div>
+              )}
             </Form.Group>
 
             <Form.Group className="mb-4">
@@ -196,11 +254,11 @@ function Register() {
               />
             </Form.Group>
 
-            <Button 
-              variant="primary" 
-              type="submit" 
+            <Button
+              variant="primary"
+              type="submit"
               className="mc-btn-primary w-100 mb-3"
-              disabled={loading}
+              disabled={loading || !allRequirementsMet}
             >
               {loading ? (
                 <>

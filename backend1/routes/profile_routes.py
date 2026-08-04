@@ -12,6 +12,7 @@ Endpoints:
 from __future__ import annotations
 
 from flask import g, request
+from marshmallow import Schema, fields, validate
 
 from db import query
 from extensions import limiter
@@ -47,13 +48,34 @@ def _decrypt_history(row):
     }
 
 
+class ProfileUpdateSchema(Schema):
+    name = fields.Str(required=False, validate=validate.Length(min=2, max=100))
+    phone = fields.Str(required=False, validate=validate.Length(max=20))
+    date_of_birth = fields.Date(required=False)
+    gender = fields.Str(required=False, validate=validate.OneOf(['male', 'female', 'other', 'prefer-not-to-say']))
+    address = fields.Str(required=False)
+    bio = fields.Str(required=False, validate=validate.Length(max=500))
+
+
+class EmergencyContactSchema(Schema):
+    emergency_contact_name = fields.Str(required=True, validate=validate.Length(min=2, max=255))
+    emergency_contact_relationship = fields.Str(required=True, validate=validate.Length(max=100))
+    emergency_contact_phone = fields.Str(required=True, validate=validate.Length(max=20))
+    emergency_contact_alt_phone = fields.Str(required=False, validate=validate.Length(max=20))
+    emergency_contact_email = fields.Email(required=False, validate=validate.Length(max=255))
+
+
 @profile_bp.get("")
 @limiter.limit("300 per minute")
 @login_required
 def get_profile():
     user_id = g.user_id
     rows = query(
-        "SELECT id, name, email, role, created_at FROM users WHERE id = %s",
+        """SELECT id, name, email, role, created_at,
+           phone, date_of_birth, gender, address, bio, avatar_url,
+           emergency_contact_name, emergency_contact_relationship,
+           emergency_contact_phone, emergency_contact_alt_phone, emergency_contact_email
+           FROM users WHERE id = %s""",
         (user_id,),
     )
     if not rows:
@@ -66,8 +88,133 @@ def get_profile():
             "email": user["email"],
             "role": user["role"],
             "created_at": _iso(user["created_at"]),
+            "phone": user.get("phone"),
+            "date_of_birth": _iso(user.get("date_of_birth")),
+            "gender": user.get("gender"),
+            "address": user.get("address"),
+            "bio": user.get("bio"),
+            "avatar_url": user.get("avatar_url"),
+            "emergency_contact": {
+                "name": user.get("emergency_contact_name"),
+                "relationship": user.get("emergency_contact_relationship"),
+                "phone": user.get("emergency_contact_phone"),
+                "alt_phone": user.get("emergency_contact_alt_phone"),
+                "email": user.get("emergency_contact_email"),
+            }
         },
         message="Profile retrieved",
+    )
+
+
+@profile_bp.put("")
+@limiter.limit("300 per minute")
+@login_required
+def update_profile():
+    user_id = g.user_id
+
+    try:
+        data = request.get_json() or {}
+    except Exception:
+        return error_response("Invalid JSON body", status=400)
+
+    allowed_fields = ['name', 'phone', 'date_of_birth', 'gender', 'address', 'bio']
+    update_fields = {}
+    for field in allowed_fields:
+        if field in data:
+            value = data[field]
+            # Normalize empty strings to None for database
+            if value == "" or value is None:
+                update_fields[field] = None
+            else:
+                update_fields[field] = value
+
+    if not update_fields:
+        return error_response("No fields to update", status=400)
+
+    set_clause = ", ".join([f"{k} = %s" for k in update_fields.keys()])
+    values = list(update_fields.values()) + [user_id]
+
+    query(f"UPDATE users SET {set_clause} WHERE id = %s", tuple(values))
+
+    logger.info("Profile updated", extra={"user_id": user_id, "fields": list(update_fields.keys())})
+
+    updated_rows = query(
+        """SELECT id, name, email, role, created_at,
+           phone, date_of_birth, gender, address, bio, avatar_url
+           FROM users WHERE id = %s""",
+        (user_id,),
+    )
+    user = updated_rows[0]
+
+    return success_response(
+        data={
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "role": user["role"],
+            "created_at": _iso(user["created_at"]),
+            "phone": user.get("phone"),
+            "date_of_birth": _iso(user.get("date_of_birth")),
+            "gender": user.get("gender"),
+            "address": user.get("address"),
+            "bio": user.get("bio"),
+            "avatar_url": user.get("avatar_url"),
+        },
+        message="Profile updated successfully",
+    )
+
+
+@profile_bp.put("/emergency-contact")
+@limiter.limit("300 per minute")
+@login_required
+def update_emergency_contact():
+    user_id = g.user_id
+
+    try:
+        data = request.get_json() or {}
+    except Exception:
+        return error_response("Invalid JSON body", status=400)
+
+    required_fields = ['emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return error_response(f"{field} is required", status=400)
+
+    update_fields = {}
+    for key, value in data.items():
+        # Normalize empty strings to None for database
+        if value == "" or value is None:
+            update_fields[key] = None
+        else:
+            update_fields[key] = value
+
+    set_clause = ", ".join([f"{k} = %s" for k in update_fields.keys()])
+    values = list(update_fields.values()) + [user_id]
+
+    query(f"UPDATE users SET {set_clause} WHERE id = %s", tuple(values))
+
+    logger.info("Emergency contact updated", extra={"user_id": user_id})
+
+    updated_rows = query(
+        """SELECT id, name, email,
+           emergency_contact_name, emergency_contact_relationship,
+           emergency_contact_phone, emergency_contact_alt_phone, emergency_contact_email
+           FROM users WHERE id = %s""",
+        (user_id,),
+    )
+    user = updated_rows[0]
+
+    return success_response(
+        data={
+            "emergency_contact": {
+                "name": user.get("emergency_contact_name"),
+                "relationship": user.get("emergency_contact_relationship"),
+                "phone": user.get("emergency_contact_phone"),
+                "alt_phone": user.get("emergency_contact_alt_phone"),
+                "email": user.get("emergency_contact_email"),
+            }
+        },
+        message="Emergency contact updated successfully",
     )
 
 

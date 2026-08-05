@@ -40,6 +40,8 @@ def _serialize_thread(row, requesting_user_id=None):
         "category": row["category"],
         "author_name": row["author_name"] or "Anonymous",
         "approval_status": row["approval_status"],
+        "reply_count": row.get("reply_count", 0),
+        "like_count": row.get("like_count", 0),
         "is_author": requesting_user_id is not None
         and row["user_id"] == requesting_user_id,
         "created_at": _iso(row["created_at"]),
@@ -68,7 +70,7 @@ def list_threads():
 
     rows = query(
         """SELECT id, user_id, title, body, category, author_name,
-                  approval_status, created_at, updated_at
+                  approval_status, reply_count, like_count, created_at, updated_at
            FROM forum_threads
            WHERE approval_status = 'approved'
            ORDER BY created_at DESC
@@ -102,7 +104,7 @@ def g_user_id():
 def get_thread(thread_id):
     rows = query(
         """SELECT id, user_id, title, body, category, author_name,
-                  approval_status, created_at, updated_at
+                  approval_status, reply_count, like_count, created_at, updated_at
            FROM forum_threads
            WHERE id = %s AND approval_status = 'approved'""",
         (thread_id,),
@@ -292,6 +294,328 @@ def delete_thread(thread_id):
     return success_response(
         data={"id": thread_id},
         message="Post deleted successfully",
+    )
+
+
+# ── Forum Replies ─────────────────────────────────────────────────────
+
+@forum_bp.get("/threads/<int:thread_id>/replies")
+@limiter.limit("300 per minute")
+@login_required
+def list_replies(thread_id):
+    page = request.args.get("page", 1, type=int)
+    limit = min(request.args.get("limit", 50, type=int), 100)
+    offset = (page - 1) * limit
+
+    # Verify thread exists
+    thread = query("SELECT id FROM forum_threads WHERE id = %s", (thread_id,))
+    if not thread:
+        return error_response("Thread not found", status=404)
+
+    rows = query(
+        """SELECT id, thread_id, user_id, body, approval_status,
+                  created_at, updated_at
+           FROM forum_replies
+           WHERE thread_id = %s AND approval_status = 'approved'
+           ORDER BY created_at ASC
+           LIMIT %s OFFSET %s""",
+        (thread_id, limit, offset),
+    )
+
+    total_rows = query(
+        "SELECT COUNT(*) as c FROM forum_replies WHERE thread_id = %s AND approval_status = 'approved'",
+        (thread_id,),
+    )
+    total = int(total_rows[0]["c"]) if total_rows else 0
+
+    replies = []
+    for r in rows:
+        replies.append({
+            "id": r["id"],
+            "thread_id": r["thread_id"],
+            "user_id": r["user_id"],
+            "body": decrypt(r["body"]) if r["body"] else "",
+            "author_name": _get_author_name(r["user_id"]),
+            "created_at": _iso(r["created_at"]),
+            "updated_at": _iso(r["updated_at"]),
+        })
+
+    resp = success_response(data=replies, message="Replies retrieved")
+    resp[0].headers["X-Page"] = str(page)
+    resp[0].headers["X-Total-Pages"] = str(-(-total // limit)) if limit else "1"
+    resp[0].headers["X-Total-Count"] = str(total)
+    return resp
+
+
+def _get_author_name(user_id):
+    rows = query("SELECT name FROM users WHERE id = %s", (user_id,))
+    return rows[0]["name"] if rows else "Anonymous"
+
+
+@forum_bp.post("/threads/<int:thread_id>/replies")
+@limiter.limit("50 per minute")
+@login_required
+def create_reply(thread_id):
+    user_id = int(g_user_id())
+
+    try:
+        data = request.get_json() or {}
+        body = data.get("body", "").strip()
+    except Exception:
+        return error_response("Invalid JSON body", status=400)
+
+    if not body or len(body) < 2:
+        return error_response("Reply must be at least 2 characters", status=400)
+
+    # Verify thread exists
+    thread = query("SELECT id FROM forum_threads WHERE id = %s", (thread_id,))
+    if not thread:
+        return error_response("Thread not found", status=404)
+
+    # Moderate the reply
+    moderation_result = moderate_text(body)
+    approval_status = "approved"
+    moderation_notes = None
+
+    if not moderation_result.get("safety", True):
+        logger.warning(
+            "Forum reply rejected by moderation",
+            extra={"user_id": user_id, "categories": moderation_result.get("categories", [])},
+        )
+        return error_response(
+            "Reply rejected: " + ", ".join(moderation_result.get("categories", [])),
+            status=400
+        )
+
+    if moderation_result.get("fallback"):
+        approval_status = "pending"
+        moderation_notes = "Moderation service unavailable - pending manual review"
+
+    enc_body = encrypt(body)
+
+    rows = query(
+        """INSERT INTO forum_replies
+           (thread_id, user_id, body, approval_status, moderation_notes, created_at, updated_at)
+           VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+           RETURNING id, created_at""",
+        (thread_id, user_id, enc_body, approval_status, moderation_notes),
+    )
+
+    reply_id = rows[0]["id"]
+
+    # Create notification for thread author
+    try:
+        thread_author = query("SELECT user_id FROM forum_threads WHERE id = %s", (thread_id,))
+        if thread_author and thread_author[0]["user_id"] != user_id:
+            query(
+                """INSERT INTO notifications
+                   (user_id, type, message, related_id, created_at)
+                   VALUES (%s, %s, %s, %s, NOW())""",
+                (thread_author[0]["user_id"], "forum_reply",
+                 f"Someone replied to your post", thread_id),
+            )
+    except Exception as notif_err:
+        logger.error("Failed to create reply notification", extra={"error": str(notif_err)})
+
+    reply_data = {
+        "id": reply_id,
+        "thread_id": thread_id,
+        "body": body,
+        "author_name": _get_author_name(user_id),
+        "created_at": _iso(rows[0]["created_at"]),
+    }
+
+    if approval_status == "pending":
+        return success_response(
+            data=reply_data,
+            message="Reply submitted for moderation",
+            status=201
+        )
+
+    return success_response(data=reply_data, message="Reply added", status=201)
+
+
+@forum_bp.put("/replies/<int:reply_id>")
+@limiter.limit("50 per minute")
+@login_required
+def update_reply(reply_id):
+    user_id = int(g_user_id())
+
+    try:
+        data = request.get_json() or {}
+        body = data.get("body", "").strip()
+    except Exception:
+        return error_response("Invalid JSON body", status=400)
+
+    if not body or len(body) < 2:
+        return error_response("Reply must be at least 2 characters", status=400)
+
+    # Get existing reply
+    reply = query(
+        "SELECT id, thread_id, user_id, body FROM forum_replies WHERE id = %s",
+        (reply_id,),
+    )
+    if not reply:
+        return error_response("Reply not found", status=404)
+
+    reply = reply[0]
+
+    # IDOR protection: only author can edit
+    if reply["user_id"] != user_id:
+        logger.warning(
+            "IDOR attempt — user tried to edit another user's reply",
+            extra={"user_id": user_id, "reply_id": reply_id},
+        )
+        return error_response("You are not authorized to edit this reply", status=403)
+
+    # Moderate the updated reply
+    moderation_result = moderate_text(body)
+    if not moderation_result.get("safety", True):
+        return error_response(
+            "Reply rejected: " + ", ".join(moderation_result.get("categories", [])),
+            status=400
+        )
+
+    enc_body = encrypt(body)
+    query(
+        "UPDATE forum_replies SET body = %s, updated_at = NOW() WHERE id = %s",
+        (enc_body, reply_id),
+    )
+
+    logger.info("Reply updated", extra={"user_id": user_id, "reply_id": reply_id})
+
+    return success_response(
+        data={
+            "id": reply_id,
+            "thread_id": reply["thread_id"],
+            "body": body,
+            "author_name": _get_author_name(user_id),
+        },
+        message="Reply updated successfully",
+    )
+
+
+@forum_bp.delete("/replies/<int:reply_id>")
+@limiter.limit("50 per minute")
+@login_required
+def delete_reply(reply_id):
+    user_id = int(g_user_id())
+    user_role = g.user_role
+
+    reply = query(
+        "SELECT id, thread_id, user_id FROM forum_replies WHERE id = %s",
+        (reply_id,),
+    )
+    if not reply:
+        return error_response("Reply not found", status=404)
+
+    reply = reply[0]
+
+    # IDOR protection: only author or admin/manager can delete
+    if reply["user_id"] != user_id and user_role not in ("admin", "manager"):
+        logger.warning(
+            "IDOR attempt — user tried to delete another user's reply",
+            extra={"user_id": user_id, "reply_id": reply_id},
+        )
+        return error_response("You are not authorized to delete this reply", status=403)
+
+    query("DELETE FROM forum_replies WHERE id = %s", (reply_id,))
+
+    logger.info("Reply deleted", extra={"user_id": user_id, "reply_id": reply_id})
+
+    return success_response(message="Reply deleted successfully")
+
+
+# ── Forum Likes/Supports ─────────────────────────────────────────────
+
+@forum_bp.post("/threads/<int:thread_id>/like")
+@limiter.limit("100 per minute")
+@login_required
+def like_thread(thread_id):
+    user_id = int(g_user_id())
+
+    # Verify thread exists
+    thread = query("SELECT id FROM forum_threads WHERE id = %s", (thread_id,))
+    if not thread:
+        return error_response("Thread not found", status=404)
+
+    # Check if already liked
+    existing = query(
+        "SELECT id FROM forum_likes WHERE thread_id = %s AND user_id = %s",
+        (thread_id, user_id),
+    )
+    if existing:
+        return error_response("You have already liked this post", status=400)
+
+    # Create like
+    query(
+        "INSERT INTO forum_likes (thread_id, user_id, created_at) VALUES (%s, %s, NOW())",
+        (thread_id, user_id),
+    )
+
+    logger.info("Post liked", extra={"user_id": user_id, "thread_id": thread_id})
+
+    return success_response(
+        data={"liked": True},
+        message="Post liked",
+        status=201
+    )
+
+
+@forum_bp.delete("/threads/<int:thread_id>/like")
+@limiter.limit("100 per minute")
+@login_required
+def unlike_thread(thread_id):
+    user_id = int(g_user_id())
+
+    # Verify thread exists
+    thread = query("SELECT id FROM forum_threads WHERE id = %s", (thread_id,))
+    if not thread:
+        return error_response("Thread not found", status=404)
+
+    # Delete like
+    deleted = query(
+        "DELETE FROM forum_likes WHERE thread_id = %s AND user_id = %s RETURNING id",
+        (thread_id, user_id),
+    )
+
+    if not deleted:
+        return error_response("You have not liked this post", status=400)
+
+    logger.info("Post unliked", extra={"user_id": user_id, "thread_id": thread_id})
+
+    return success_response(
+        data={"liked": False},
+        message="Post unliked"
+    )
+
+
+@forum_bp.get("/threads/<int:thread_id>/likes")
+@limiter.limit("300 per minute")
+@login_required
+def get_like_status(thread_id):
+    user_id = int(g_user_id())
+
+    # Verify thread exists
+    thread = query(
+        "SELECT id, like_count FROM forum_threads WHERE id = %s",
+        (thread_id,),
+    )
+    if not thread:
+        return error_response("Thread not found", status=404)
+
+    # Check if user liked
+    liked = query(
+        "SELECT id FROM forum_likes WHERE thread_id = %s AND user_id = %s",
+        (thread_id, user_id),
+    )
+
+    return success_response(
+        data={
+            "count": thread[0]["like_count"],
+            "liked": bool(liked),
+        },
+        message="Like status retrieved",
     )
 
 

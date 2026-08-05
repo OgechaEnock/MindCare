@@ -16,6 +16,14 @@ export default function Forum() {
   const [deleteModal, setDeleteModal] = useState({ show: false, postId: null, postTitle: '' });
   const [activeCategory, setActiveCategory] = useState('all');
   const [moderationError, setModerationError] = useState(null);
+  const [replies, setReplies] = useState({});
+  const [replyForms, setReplyForms] = useState({});
+  const [replyTexts, setReplyTexts] = useState({});
+  const [likes, setLikes] = useState({});
+  const [likeCounts, setLikeCounts] = useState({});
+  const [submittingReply, setSubmittingReply] = useState({});
+  const [editingReply, setEditingReply] = useState(null);
+  const [expandedThread, setExpandedThread] = useState(null);
 
   const categories = [
     { value: 'all', label: 'All Posts' },
@@ -30,6 +38,12 @@ export default function Forum() {
     fetchThreads();
   }, []);
 
+  useEffect(() => {
+    threads.forEach(thread => {
+      fetchLikeStatus(thread.id);
+    });
+  }, [threads]);
+
   const fetchThreads = async () => {
     try {
       const res = await api.get('/api/forum/threads');
@@ -39,6 +53,36 @@ export default function Forum() {
       toast.error('Failed to load forum threads');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReplies = async (threadId) => {
+    try {
+      const res = await api.get(`/api/forum/threads/${threadId}/replies`);
+      setReplies(prev => ({ ...prev, [threadId]: res.data }));
+    } catch (err) {
+      console.error("Fetch replies error:", err);
+    }
+  };
+
+  const fetchLikeStatus = async (threadId) => {
+    try {
+      const res = await api.get(`/api/forum/threads/${threadId}/likes`);
+      setLikes(prev => ({ ...prev, [threadId]: res.data.liked }));
+      setLikeCounts(prev => ({ ...prev, [threadId]: res.data.count }));
+    } catch (err) {
+      console.error("Fetch like status error:", err);
+    }
+  };
+
+  const handleThreadClick = (threadId) => {
+    if (expandedThread === threadId) {
+      setExpandedThread(null);
+    } else {
+      setExpandedThread(threadId);
+      if (!replies[threadId]) {
+        fetchReplies(threadId);
+      }
     }
   };
 
@@ -105,7 +149,6 @@ export default function Forum() {
         const categories = errorData.categories || [];
         const reason = errorData.reason || errorData.error || 'Content did not pass moderation';
         
-        // Show detailed moderation rejection
         if (categories.length > 0) {
           setModerationError({
             message: reason,
@@ -152,8 +195,97 @@ export default function Forum() {
     }
   };
 
+  const handleLike = async (threadId) => {
+    try {
+      await api.post(`/api/forum/threads/${threadId}/like`);
+      toast.success("You liked this post!");
+      fetchLikeStatus(threadId);
+    } catch (err) {
+      console.error("Like error:", err);
+      toast.error(err.response?.data?.error || "Failed to like post");
+    }
+  };
+
+  const handleUnlike = async (threadId) => {
+    try {
+      await api.delete(`/api/forum/threads/${threadId}/like`);
+      fetchLikeStatus(threadId);
+    } catch (err) {
+      console.error("Unlike error:", err);
+      toast.error(err.response?.data?.error || "Failed to unlike post");
+    }
+  };
+
+  const toggleReplyForm = (threadId) => {
+    setReplyForms(prev => ({ ...prev, [threadId]: !prev[threadId] }));
+  };
+
+  const handleReplySubmit = async (threadId) => {
+    const body = replyTexts[threadId]?.trim();
+    if (!body || body.length < 2) {
+      toast.error("Reply must be at least 2 characters");
+      return;
+    }
+
+    setSubmittingReply(prev => ({ ...prev, [threadId]: true }));
+
+    try {
+      await api.post(`/api/forum/threads/${threadId}/replies`, { body });
+      toast.success("Reply added!");
+      setReplyTexts(prev => ({ ...prev, [threadId]: "" }));
+      setReplyForms(prev => ({ ...prev, [threadId]: false }));
+      fetchReplies(threadId);
+    } catch (err) {
+      console.error("Reply error:", err);
+      toast.error(err.response?.data?.error || "Failed to add reply");
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [threadId]: false }));
+    }
+  };
+
+  const handleEditReply = async (replyId, threadId) => {
+    const body = replyTexts[replyId]?.trim();
+    if (!body || body.length < 2) {
+      toast.error("Reply must be at least 2 characters");
+      return;
+    }
+
+    setSubmittingReply(prev => ({ ...prev, [replyId]: true }));
+
+    try {
+      await api.put(`/api/forum/replies/${replyId}`, { body });
+      toast.success("Reply updated!");
+      setEditingReply(null);
+      fetchReplies(threadId);
+    } catch (err) {
+      console.error("Edit reply error:", err);
+      toast.error(err.response?.data?.error || "Failed to update reply");
+    } finally {
+      setSubmittingReply(prev => ({ ...prev, [replyId]: false }));
+    }
+  };
+
+  const handleDeleteReply = async (replyId, threadId) => {
+    if (!window.confirm("Are you sure you want to delete this reply?")) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/forum/replies/${replyId}`);
+      toast.success("Reply deleted");
+      fetchReplies(threadId);
+    } catch (err) {
+      console.error("Delete reply error:", err);
+      toast.error("Failed to delete reply");
+    }
+  };
+
   const canDelete = (post) => {
     return post.user_id === user?.id || user?.role === 'admin' || user?.role === 'manager';
+  };
+
+  const canEditReply = (reply) => {
+    return reply.user_id === user?.id || user?.role === 'admin' || user?.role === 'manager';
   };
 
   const formatDate = (dateString) => {
@@ -170,6 +302,25 @@ export default function Forum() {
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString('en-US', { 
       month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
+  };
+
+  const formatReplyDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
     });
@@ -290,7 +441,17 @@ export default function Forum() {
       ) : (
         <div>
           {filteredThreads.map((thread) => (
-            <Card key={thread.id} className="mb-3 shadow-sm mc-lift" style={{ borderRadius: 'var(--mc-radius-xl)' }}>
+            <Card 
+              key={thread.id} 
+              className="mb-3 shadow-sm mc-lift" 
+              style={{ 
+                borderRadius: 'var(--mc-radius-xl)',
+                cursor: 'pointer',
+                border: expandedThread === thread.id ? '2px solid #4f46e5' : '2px solid transparent',
+                transition: 'all 0.2s ease'
+              }}
+              onClick={() => handleThreadClick(thread.id)}
+            >
               <Card.Body className="p-4">
                 <div className="d-flex justify-content-between align-items-start">
                   <div className="flex-grow-1">
@@ -322,12 +483,40 @@ export default function Forum() {
                             variant="outline-danger" 
                             size="sm"
                             className="rounded-pill"
-                            onClick={() => handleDeleteClick(thread)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(thread);
+                            }}
                           >
                             <i className="bi bi-trash me-1"></i>
                             Delete
                           </Button>
                         )}
+                        <Button
+                          variant={likes[thread.id] ? "outline-danger" : "outline-secondary"}
+                          size="sm"
+                          className="rounded-pill"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            likes[thread.id] ? handleUnlike(thread.id) : handleLike(thread.id);
+                          }}
+                        >
+                          <i className={`bi ${likes[thread.id] ? 'bi-heart-fill' : 'bi-heart'} me-1`}></i>
+                          {likeCounts[thread.id] || 0}
+                        </Button>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          className="rounded-pill"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleThreadClick(thread.id);
+                            toggleReplyForm(thread.id);
+                          }}
+                        >
+                          <i className="bi bi-chat me-1"></i>
+                          {thread.reply_count || 0}
+                        </Button>
                         <Badge 
                           bg={
                             thread.approval_status === 'approved' ? 'success' : 
@@ -349,6 +538,174 @@ export default function Forum() {
                   </div>
                 </div>
               </Card.Body>
+
+              {/* Replies Section - Expanded inline */}
+              {expandedThread === thread.id && (
+                <Card.Body className="border-top bg-light" style={{ borderTop: '1px solid #e5e7eb' }}>
+                  <h6 className="fw-bold mb-3">
+                    <i className="bi bi-chat-dots me-2 text-primary"></i>
+                    {(replies[thread.id]?.length || 0)} {(replies[thread.id]?.length === 1 ? 'Reply' : 'Replies')}
+                  </h6>
+
+                  {replies[thread.id]?.length === 0 ? (
+                    <div className="text-center py-3">
+                      <p className="text-muted mb-0 small">No replies yet. Be the first to respond!</p>
+                    </div>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {replies[thread.id]?.map((reply, index) => (
+                        <div key={reply.id} className="pb-3" style={{ borderBottom: index < replies[thread.id].length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div className="flex-grow-1">
+                              <div className="d-flex align-items-center mb-2">
+                                <strong className="me-2">{reply.author_name || "Anonymous"}</strong>
+                                <small className="text-muted">
+                                  <i className="bi bi-clock me-1"></i>
+                                  {formatReplyDate(reply.created_at)}
+                                </small>
+                              </div>
+                              {editingReply === reply.id ? (
+                                <div>
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={replyTexts[reply.id] || ''}
+                                    onChange={(e) => setReplyTexts(prev => ({ ...prev, [reply.id]: e.target.value }))}
+                                    className="rounded-3 mb-2"
+                                  />
+                                  <div className="d-flex gap-2">
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditReply(reply.id, thread.id);
+                                      }}
+                                      disabled={submittingReply[reply.id]}
+                                      className="rounded-pill"
+                                    >
+                                      {submittingReply[reply.id] ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button
+                                      variant="outline-secondary"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingReply(null);
+                                      }}
+                                      className="rounded-pill"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>{reply.body}</p>
+                                  {canEditReply(reply) && (
+                                    <div className="d-flex gap-2">
+                                      <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        className="rounded-pill"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingReply(reply.id);
+                                          setReplyTexts(prev => ({ ...prev, [reply.id]: reply.body }));
+                                        }}
+                                      >
+                                        <i className="bi bi-pencil me-1"></i>
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="outline-danger"
+                                        size="sm"
+                                        className="rounded-pill"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteReply(reply.id, thread.id);
+                                        }}
+                                      >
+                                        <i className="bi bi-trash me-1"></i>
+                                        Delete
+                                      </Button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Reply Form - Shows when expanded */}
+                  {replyForms[thread.id] && (
+                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid #e5e7eb' }}>
+                      <Form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(thread.id); }}>
+                        <Alert variant="info" className="small mb-3 rounded-3">
+                          <i className="bi bi-shield-check me-2"></i>
+                          Your reply will be checked by AI moderation before publishing.
+                        </Alert>
+
+                        <Form.Group className="mb-3">
+                          <Form.Label className="fw-medium">Your Reply</Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            rows={3}
+                            placeholder="Share your thoughts, support, or advice..."
+                            value={replyTexts[thread.id] || ''}
+                            onChange={(e) => setReplyTexts(prev => ({ ...prev, [thread.id]: e.target.value }))}
+                            maxLength={5000}
+                            required
+                            disabled={submittingReply[thread.id]}
+                            className="rounded-3"
+                          />
+                          <Form.Text className="text-muted">
+                            {(replyTexts[thread.id] || '').length}/5000 characters
+                            {(replyTexts[thread.id] || '').length > 0 && (replyTexts[thread.id] || '').length < 2 && (
+                              <span className="text-danger ms-2">• Minimum 2 characters</span>
+                            )}
+                          </Form.Text>
+                        </Form.Group>
+
+                        <div className="d-flex gap-2">
+                          <Button
+                            variant="outline-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReplyForms(prev => ({ ...prev, [thread.id]: false }));
+                            }}
+                            disabled={submittingReply[thread.id]}
+                            className="rounded-pill px-4"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="primary"
+                            type="submit"
+                            disabled={submittingReply[thread.id] || (replyTexts[thread.id] || '').length < 2}
+                            className="rounded-pill px-4"
+                          >
+                            {submittingReply[thread.id] ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                Posting...
+                              </>
+                            ) : (
+                              <>
+                                <i className="bi bi-send me-2"></i>
+                                Post Reply
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </Form>
+                    </div>
+                  )}
+                </Card.Body>
+              )}
             </Card>
           ))}
         </div>

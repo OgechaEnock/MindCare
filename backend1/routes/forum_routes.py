@@ -241,6 +241,95 @@ def create_thread():
     )
 
 
+@forum_bp.put("/threads/<int:thread_id>")
+@limiter.limit("100 per minute")
+@login_required
+def update_thread(thread_id):
+    data = request.get_json(silent=True) or {}
+    user_id = int(g_user_id())
+
+    title = (data.get("title") or "").strip()
+    body = (data.get("body") or "").strip()
+    category = data.get("category") or "general"
+
+    if not title or len(title) < 5:
+        return error_response("Title must be at least 5 characters", status=400)
+    if not body or len(body) < 10:
+        return error_response("Content must be at least 10 characters", status=400)
+    if category not in FORUM_CATEGORIES:
+        return error_response("Invalid category", status=400)
+
+    post_rows = query(
+        "SELECT user_id FROM forum_threads WHERE id = %s",
+        (thread_id,),
+    )
+    if not post_rows:
+        return error_response("Post not found", status=404)
+
+    # IDOR protection: only the author OR admin/manager can edit
+    user_role = g.user_role  # populated by login_required decorator
+    if post_rows[0]["user_id"] != user_id and user_role not in ("admin", "manager"):
+        logger.warning(
+            "IDOR attempt — user tried to edit another user's thread",
+            extra={"user_id": user_id, "thread_id": thread_id, "user_role": user_role},
+        )
+        return error_response("You are not authorized to edit this post", status=403)
+
+    # Moderate the updated content
+    combined_text = f"Title: {title}\n\nBody: {body}"
+    moderation_result = moderate_text(combined_text)
+
+    if not moderation_result.get("safety", True):
+        response_body = {
+            "success": False,
+            "message": "Your post cannot be published",
+            "errors": ["Content did not pass safety checks"],
+            "categories": moderation_result.get("categories", []),
+            "reason": moderation_result.get("reason", "Content safety check failed"),
+        }
+        response_body["data"] = None
+        return jsonify(response_body), 400
+
+    approval_status = "approved"
+    moderation_notes = None
+
+    if moderation_result.get("fallback"):
+        approval_status = "pending"
+        moderation_notes = "Moderation service unavailable - pending manual review"
+        logger.warning(
+            "Moderation fallback - edited post pending review",
+            extra={"user_id": user_id, "thread_id": thread_id},
+        )
+
+    enc_title = encrypt(title)
+    enc_body = encrypt(body)
+
+    query(
+        """UPDATE forum_threads
+           SET title = %s, body = %s, category = %s,
+               approval_status = %s, moderation_notes = %s, updated_at = NOW()
+           WHERE id = %s""",
+        (enc_title, enc_body, category, approval_status, moderation_notes, thread_id),
+    )
+
+    logger.info(
+        "Thread updated",
+        extra={"user_id": user_id, "thread_id": thread_id},
+    )
+
+    return success_response(
+        data={
+            "id": thread_id,
+            "title": title,
+            "body": body,
+            "category": category,
+            "approval_status": approval_status,
+            "updated_at": _iso(datetime.utcnow()),
+        },
+        message="Post updated successfully",
+    )
+
+
 @forum_bp.delete("/threads/<int:thread_id>")
 @limiter.limit("300 per minute")
 @login_required

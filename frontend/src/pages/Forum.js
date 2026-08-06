@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner } from 'react-bootstrap';
+import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner, Dropdown } from 'react-bootstrap';
 import api from '../services/api';
-import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = [
@@ -67,6 +66,13 @@ export default function Forum() {
   useEffect(() => {
     fetchThreads();
   }, []);
+
+  // Fetch like status for all threads once loaded
+  useEffect(() => {
+    threads.forEach(thread => {
+      fetchLikeStatus(thread.id);
+    });
+  }, [threads]);
 
   useEffect(() => {
     if (searchDebounce.current) clearTimeout(searchDebounce.current);
@@ -243,7 +249,6 @@ export default function Forum() {
         await api.post(`/api/forum/threads/${threadId}/like`);
         setLikeCounts((prev) => ({ ...prev, [threadId]: (prev[threadId] || 0) + 1 }));
         setLikes((prev) => ({ ...prev, [threadId]: true }));
-        pushToast('You liked this post!', 'success');
       }
     } catch (err) {
       console.error("Like error:", err);
@@ -516,16 +521,6 @@ export default function Forum() {
                       {formatDate(thread.created_at)}
                     </div>
                     <div className="d-flex align-items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      {canModify(thread) && (
-                        <>
-                          <Button variant="outline-secondary" size="sm" className="rounded-pill" onClick={() => openEdit(thread)}>
-                            <i className="bi bi-pencil me-1"></i>Edit
-                          </Button>
-                          <Button variant="outline-danger" size="sm" className="rounded-pill" onClick={() => setDeleteTarget(thread)}>
-                            <i className="bi bi-trash me-1"></i>Delete
-                          </Button>
-                        </>
-                      )}
                       <Button
                         variant={likes[thread.id] ? "outline-danger" : "outline-secondary"}
                         size="sm"
@@ -544,6 +539,22 @@ export default function Forum() {
                         <i className="bi bi-chat me-1"></i>
                         {thread.reply_count || 0}
                       </Button>
+                      {canModify(thread) && (
+                        <Dropdown align="end">
+                          <Dropdown.Toggle variant="outline-secondary" size="sm" className="rounded-pill border-0 bg-transparent">
+                            <i className="bi bi-three-dots"></i>
+                          </Dropdown.Toggle>
+                          <Dropdown.Menu>
+                            <Dropdown.Item onClick={() => openEdit(thread)}>
+                              <i className="bi bi-pencil me-2 text-primary"></i>Edit Post
+                            </Dropdown.Item>
+                            <Dropdown.Divider />
+                            <Dropdown.Item onClick={() => setDeleteTarget(thread)} className="text-danger">
+                              <i className="bi bi-trash me-2"></i>Delete Post
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        </Dropdown>
+                      )}
                     </div>
                   </div>
                 </Card.Body>
@@ -595,24 +606,20 @@ export default function Forum() {
                               <>
                                 <p className="mb-2" style={{ whiteSpace: 'pre-wrap' }}>{reply.body}</p>
                                 {canModify(reply) && (
-                                  <div className="d-flex gap-2">
-                                    <Button
-                                      variant="outline-primary"
-                                      size="sm"
-                                      className="rounded-pill"
-                                      onClick={() => { setEditingReply(reply.id); setReplyTexts((prev) => ({ ...prev, [reply.id]: reply.body })); }}
-                                    >
-                                      <i className="bi bi-pencil me-1"></i>Edit
-                                    </Button>
-                                    <Button
-                                      variant="outline-danger"
-                                      size="sm"
-                                      className="rounded-pill"
-                                      onClick={() => deleteReply(thread.id, reply.id)}
-                                    >
-                                      <i className="bi bi-trash me-1"></i>Delete
-                                    </Button>
-                                  </div>
+                                  <Dropdown align="end">
+                                    <Dropdown.Toggle variant="outline-secondary" size="sm" className="rounded-pill border-0 bg-transparent">
+                                      <i className="bi bi-three-dots"></i>
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu>
+                                      <Dropdown.Item onClick={() => { setEditingReply(reply.id); setReplyTexts((prev) => ({ ...prev, [reply.id]: reply.body })); }}>
+                                        <i className="bi bi-pencil me-2 text-primary"></i>Edit Reply
+                                      </Dropdown.Item>
+                                      <Dropdown.Divider />
+                                      <Dropdown.Item onClick={() => deleteReply(thread.id, reply.id)} className="text-danger">
+                                        <i className="bi bi-trash me-2"></i>Delete Reply
+                                      </Dropdown.Item>
+                                    </Dropdown.Menu>
+                                  </Dropdown>
                                 )}
                               </>
                             )}

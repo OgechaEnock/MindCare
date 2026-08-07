@@ -20,7 +20,8 @@ from marshmallow import ValidationError
 from schemas import (
     RegisterSchema, LoginSchema, AppointmentCreateSchema,
     MedicationCreateSchema, ForumThreadCreateSchema, MedicalHistorySchema,
-    PaginationSchema, _validate_password_complexity,
+    PaginationSchema, EmergencyContactSchema, ProfileUpdateSchema,
+    _validate_password_complexity,
 )
 from utils.responses import success_response, error_response
 
@@ -174,6 +175,32 @@ class TestSchemaValidation:
     def test_medical_history_valid(self):
         data = MedicalHistorySchema().load({"diagnosis": "Anxiety disorder"})
         assert data["diagnosis"] == "Anxiety disorder"
+
+    def test_emergency_contact_valid(self):
+        data = EmergencyContactSchema().load({
+            "emergency_contact_name": "Jane Doe",
+            "emergency_contact_relationship": "Sibling",
+            "emergency_contact_phone": "+254700000000",
+            "emergency_contact_alt_phone": None,
+        })
+        assert data["emergency_contact_alt_phone"] is None
+
+    def test_emergency_contact_unknown_field_rejected(self):
+        with pytest.raises(ValidationError):
+            EmergencyContactSchema().load({
+                "emergency_contact_name": "Jane Doe",
+                "emergency_contact_relationship": "Sibling",
+                "emergency_contact_phone": "+254700000000",
+                "untrusted_column": "not allowed",
+            })
+
+    def test_profile_update_accepts_optional_nulls(self):
+        data = ProfileUpdateSchema().load({"phone": None, "bio": None})
+        assert data == {"phone": None, "bio": None}
+
+    def test_profile_update_unknown_field_rejected(self):
+        with pytest.raises(ValidationError):
+            ProfileUpdateSchema().load({"role": "admin"})
 
 
 # ─── Response Standardization Tests ─────────────────────────────────────

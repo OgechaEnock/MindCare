@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Container, Form, Button, Card, Badge, Modal, Alert, Spinner, Dropdown } from 'react-bootstrap';
+import { Container, Button, Card, Badge, Spinner, Dropdown } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,8 +28,6 @@ const SORT_OPTIONS = [
 ];
 
 const PAGE_SIZE = 4;
-const FLAGGED_WORDS = ['kill myself', 'buy drugs', 'hate speech'];
-
 export default function Forum() {
   const { user } = useAuth();
   const [threads, setThreads] = useState([]);
@@ -63,16 +61,50 @@ export default function Forum() {
   const searchDebounce = useRef(null);
   const toastId = useRef(1);
 
+  const pushToast = useCallback((message, type = 'info') => {
+    const id = toastId.current++;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
+
+  const fetchThreads = useCallback(async () => {
+    try {
+      const res = await api.get('/api/forum/threads');
+      setThreads(res.data);
+
+      const initialLikes = {};
+      res.data.forEach(thread => {
+        initialLikes[thread.id] = thread.like_count || 0;
+      });
+      setLikeCounts(initialLikes);
+    } catch (err) {
+      console.error("Fetch threads error:", err);
+      pushToast('Failed to load forum threads', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [pushToast]);
+
+  const fetchLikeStatus = useCallback(async (threadId) => {
+    try {
+      const res = await api.get(`/api/forum/threads/${threadId}/likes`);
+      setLikes(prev => ({ ...prev, [threadId]: res.data.liked }));
+      setLikeCounts(prev => ({ ...prev, [threadId]: res.data.count }));
+    } catch (err) {
+      console.error("Fetch like status error:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchThreads();
-  }, []);
+  }, [fetchThreads]);
 
   // Fetch like status for all threads once loaded
   useEffect(() => {
     threads.forEach(thread => {
       fetchLikeStatus(thread.id);
     });
-  }, [threads]);
+  }, [threads, fetchLikeStatus]);
 
   useEffect(() => {
     if (searchDebounce.current) clearTimeout(searchDebounce.current);
@@ -87,31 +119,6 @@ export default function Forum() {
     setVisibleCount(PAGE_SIZE);
   }, [activeCategory, sortBy]);
 
-  const pushToast = useCallback((message, type = 'info') => {
-    const id = toastId.current++;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
-  }, []);
-
-  const fetchThreads = async () => {
-    try {
-      const res = await api.get('/api/forum/threads');
-      setThreads(res.data);
-      
-      // Initialize like counts from thread data
-      const initialLikes = {};
-      res.data.forEach(thread => {
-        initialLikes[thread.id] = thread.like_count || 0;
-      });
-      setLikeCounts(initialLikes);
-    } catch (err) {
-      console.error("Fetch threads error:", err);
-      pushToast('Failed to load forum threads', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchReplies = async (threadId) => {
     setLoadingReplies(prev => ({ ...prev, [threadId]: true }));
     try {
@@ -121,16 +128,6 @@ export default function Forum() {
       console.error("Fetch replies error:", err);
     } finally {
       setLoadingReplies(prev => ({ ...prev, [threadId]: false }));
-    }
-  };
-
-  const fetchLikeStatus = async (threadId) => {
-    try {
-      const res = await api.get(`/api/forum/threads/${threadId}/likes`);
-      setLikes(prev => ({ ...prev, [threadId]: res.data.liked }));
-      setLikeCounts(prev => ({ ...prev, [threadId]: res.data.count }));
-    } catch (err) {
-      console.error("Fetch like status error:", err);
     }
   };
 

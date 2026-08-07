@@ -147,6 +147,31 @@ class MedicalHistorySchema(Schema):
             raise ValidationError("At least one field is required")
 
 
+class EmergencyContactSchema(Schema):
+    """Validated fields accepted by the emergency-contact endpoint."""
+
+    emergency_contact_name = fields.Str(required=True, validate=validate.Length(min=2, max=255))
+    emergency_contact_relationship = fields.Str(required=True, validate=validate.Length(max=100))
+    emergency_contact_phone = fields.Str(required=True, validate=validate.Length(max=20))
+    emergency_contact_alt_phone = fields.Str(required=False, allow_none=True, validate=validate.Length(max=20))
+    emergency_contact_email = fields.Email(required=False, allow_none=True, validate=validate.Length(max=255))
+
+
+class ProfileUpdateSchema(Schema):
+    """Validated fields accepted by the profile-update endpoint."""
+
+    name = fields.Str(required=False, validate=validate.Length(min=2, max=100))
+    phone = fields.Str(required=False, allow_none=True, validate=validate.Length(max=20))
+    date_of_birth = fields.Date(required=False, allow_none=True)
+    gender = fields.Str(
+        required=False,
+        allow_none=True,
+        validate=validate.OneOf(["male", "female", "other", "prefer-not-to-say"]),
+    )
+    address = fields.Str(required=False, allow_none=True)
+    bio = fields.Str(required=False, allow_none=True, validate=validate.Length(max=500))
+
+
 # ─── Validation helper ──────────────────────────────────────────────────
 
 def validate_request(schema_cls: type[Schema], data: dict | None = None):

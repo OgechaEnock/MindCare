@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-
+// The Flask API is the single backend contract used by the frontend. Keeping
+// this value in one place prevents the proxy and direct Axios calls drifting.
+export const API_BASE_URL =(process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -62,7 +63,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Handle 401 — try to refresh the access token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       const authPaths = ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'];
       if (!authPaths.some(p => originalRequest.url.includes(p))) {
         originalRequest._retry = true;
@@ -82,33 +83,35 @@ api.interceptors.response.use(
         isRefreshing = true;
         const refreshToken = localStorage.getItem('refreshToken');
 
-        if (refreshToken) {
-          try {
-            const res = await axios.post(
-              `${API_BASE_URL}/api/auth/refresh`,
-              {},
-              { headers: { Authorization: `Bearer ${refreshToken}` } }
-            );
-            const newAccessToken = res.data.data?.access;
-            if (newAccessToken) {
-              localStorage.setItem('authToken', newAccessToken);
-              api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-              processQueue(null, newAccessToken);
-              return api(originalRequest);
-            }
-          } catch (refreshError) {
-            processQueue(refreshError, null);
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('refreshToken');
-            window.location.href = '/';
+        try {
+          if (!refreshToken) {
+            throw new Error('No refresh token is available');
           }
-        } else {
+
+          const res = await axios.post(
+            `${API_BASE_URL}/api/auth/refresh`,
+            {},
+            { headers: { Authorization: `Bearer ${refreshToken}` } }
+          );
+          const newAccessToken = res.data?.data?.access;
+          if (!newAccessToken) {
+            throw new Error('Refresh response did not include an access token');
+          }
+
+          localStorage.setItem('authToken', newAccessToken);
+          api.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          processQueue(null, newAccessToken);
+          return api(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
           localStorage.removeItem('authToken');
           localStorage.removeItem('refreshToken');
           window.location.href = '/';
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
         }
-        isRefreshing = false;
       }
     }
 

@@ -76,8 +76,8 @@ This platform enables users to:
 ##  Technology Stack
 
 **Backend**
-- Node.js (v18+)
-- Express.js
+- Python (v3.11+)
+- Flask
 - PostgreSQL
 - JWT, bcrypt, AES encryption
 - node-cron for reminders
@@ -103,9 +103,10 @@ This platform enables users to:
 
 Ensure these are installed:
 
-node --version  # v18+
-npm --version   # v8+
-psql --version  # v12+
+node --version    # v18+
+npm --version     # v8+
+python3 --version # v3.11+
+psql --version    # v12+
 
 
 
@@ -113,13 +114,14 @@ psql --version  # v12+
 
 ##  Fork and Clone The Repository
 
-git clone [https:(https://github.com/OgechaEnock/MindCare)
-cd mental-health-app
+git clone https://github.com/OgechaEnock/MindCare.git
+cd MindCare
 
 ##  Backend Setup
 
-cd backend
-npm install
+cd backend1
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 
 ##  Frontend Setup
 
@@ -128,33 +130,26 @@ npm install
 
 ##   Backend Configuration
 
-PORT=3000
-DB_USER=patient
-DB_PASSWORD=your_password
-DB_NAME=mental_health_db
-DB_HOST=localhost
-DB_PORT=5432
-ENCRYPTION_KEY=12345678901234567890123456789012
-JWT_SECRET=super_secure_random_secret
-FRONTEND_URL=http://localhost:3001
+Copy `backend1/.env.example` to `backend1/.env`, then set unique secrets and
+your PostgreSQL connection values. Do not commit the resulting `.env` file.
 
 ##   Frontend Configuration
 
-REACT_APP_API_URL=http://localhost:3000
+REACT_APP_API_URL=http://localhost:4000
 
 ##  Database Setup
 Run
 CREATE DATABASE mental_health_db;
 
 ##  Run Schema
-psql -U patient -d mental_health_db -f schema.sql
+psql -U postgres -d mental_health_db -f backend1/schema.sql
+psql -U postgres -d mental_health_db -f backend1/migrations/002_add_profile_fields.sql
+psql -U postgres -d mental_health_db -f backend1/migrations/003_forum_features.sql
 
 ## Running the Application Backend
-cd backend
-npm run dev
+cd backend1
+.venv/bin/python app.py
 
 ## Running the Application Frontend
 cd frontend
 npm start
-
-

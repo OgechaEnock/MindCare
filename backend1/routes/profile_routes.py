@@ -12,12 +12,17 @@ Endpoints:
 from __future__ import annotations
 
 from flask import g, request
-from marshmallow import Schema, fields, validate
-
 from db import query
 from extensions import limiter
 from middleware.decorators import login_required
-from schemas import MedicalHistorySchema, PaginationSchema, validate_query, validate_request
+from schemas import (
+    EmergencyContactSchema,
+    MedicalHistorySchema,
+    PaginationSchema,
+    ProfileUpdateSchema,
+    validate_query,
+    validate_request,
+)
 from utils.encrypt import decrypt, encrypt
 from utils.logger import get_logger
 from utils.responses import error_response, success_response
@@ -46,23 +51,6 @@ def _decrypt_history(row):
         "created_at": _iso(row["created_at"]),
         "updated_at": _iso(row["updated_at"]),
     }
-
-
-class ProfileUpdateSchema(Schema):
-    name = fields.Str(required=False, validate=validate.Length(min=2, max=100))
-    phone = fields.Str(required=False, validate=validate.Length(max=20))
-    date_of_birth = fields.Date(required=False)
-    gender = fields.Str(required=False, validate=validate.OneOf(['male', 'female', 'other', 'prefer-not-to-say']))
-    address = fields.Str(required=False)
-    bio = fields.Str(required=False, validate=validate.Length(max=500))
-
-
-class EmergencyContactSchema(Schema):
-    emergency_contact_name = fields.Str(required=True, validate=validate.Length(min=2, max=255))
-    emergency_contact_relationship = fields.Str(required=True, validate=validate.Length(max=100))
-    emergency_contact_phone = fields.Str(required=True, validate=validate.Length(max=20))
-    emergency_contact_alt_phone = fields.Str(required=False, validate=validate.Length(max=20))
-    emergency_contact_email = fields.Email(required=False, validate=validate.Length(max=255))
 
 
 @profile_bp.get("")
@@ -108,14 +96,11 @@ def get_profile():
 
 @profile_bp.put("")
 @limiter.limit("300 per minute")
+@validate_request(ProfileUpdateSchema)
 @login_required
 def update_profile():
     user_id = g.user_id
-
-    try:
-        data = request.get_json() or {}
-    except Exception:
-        return error_response("Invalid JSON body", status=400)
+    data = request.validated
 
     allowed_fields = ['name', 'phone', 'date_of_birth', 'gender', 'address', 'bio']
     update_fields = {}
@@ -174,32 +159,31 @@ def update_profile():
 
 @profile_bp.put("/emergency-contact")
 @limiter.limit("300 per minute")
+@validate_request(EmergencyContactSchema)
 @login_required
 def update_emergency_contact():
     user_id = g.user_id
+    data = request.validated
 
-    try:
-        data = request.get_json() or {}
-    except Exception:
-        return error_response("Invalid JSON body", status=400)
-
-    required_fields = ['emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone']
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return error_response(f"{field} is required", status=400)
-
-    update_fields = {}
-    for key, value in data.items():
-        # Normalize empty strings to None for database
-        if value == "" or value is None:
-            update_fields[key] = None
-        else:
-            update_fields[key] = value
-
-    set_clause = ", ".join([f"{k} = %s" for k in update_fields.keys()])
-    values = list(update_fields.values()) + [user_id]
-
-    query(f"UPDATE users SET {set_clause} WHERE id = %s", tuple(values))
+    # Keep column names static. Values are parameterized by db.query, and
+    # Marshmallow rejects unknown JSON keys before they reach this handler.
+    query(
+        """UPDATE users
+           SET emergency_contact_name = %s,
+               emergency_contact_relationship = %s,
+               emergency_contact_phone = %s,
+               emergency_contact_alt_phone = %s,
+               emergency_contact_email = %s
+           WHERE id = %s""",
+        (
+            data["emergency_contact_name"],
+            data["emergency_contact_relationship"],
+            data["emergency_contact_phone"],
+            data.get("emergency_contact_alt_phone"),
+            data.get("emergency_contact_email"),
+            user_id,
+        ),
+    )
 
     logger.info("Emergency contact updated", extra={"user_id": user_id})
 

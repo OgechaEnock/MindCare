@@ -2,11 +2,9 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
-import api from "../services/api";
+import api, { API_BASE_URL } from "../services/api";
 
 const AuthContext = createContext();
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -15,34 +13,43 @@ export const AuthProvider = ({ children }) => {
 
   // Restore user session on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem("authToken");
-    const storedRefresh = localStorage.getItem("refreshToken");
-    if (storedToken) {
-      try {
-        const decoded = jwtDecode(storedToken);
-        const currentTime = Date.now() / 1000;
-        if (decoded.exp < currentTime) {
-          // Access token expired — try refresh
-          if (storedRefresh) {
-            refreshToken(storedRefresh).catch(() => {
+    let mounted = true;
+
+    const restoreSession = async () => {
+      const storedToken = localStorage.getItem("authToken");
+      const storedRefresh = localStorage.getItem("refreshToken");
+      if (storedToken) {
+        try {
+          const decoded = jwtDecode(storedToken);
+          const currentTime = Date.now() / 1000;
+          if (decoded.exp < currentTime) {
+            // Access token expired — try refresh before rendering routes.
+            if (storedRefresh) {
+              await refreshToken(storedRefresh).catch(() => {
+                localStorage.removeItem("authToken");
+                localStorage.removeItem("refreshToken");
+              });
+            } else {
               localStorage.removeItem("authToken");
-              localStorage.removeItem("refreshToken");
-            });
+            }
           } else {
-            localStorage.removeItem("authToken");
+            setUser(decoded);
+            setToken(storedToken);
+            api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
           }
-        } else {
-          setUser(decoded);
-          setToken(storedToken);
-          api.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
+        } catch (err) {
+          console.error("Invalid stored token:", err);
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("refreshToken");
         }
-      } catch (err) {
-        console.error("Invalid stored token:", err);
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("refreshToken");
       }
-    }
-    setLoading(false);
+      if (mounted) setLoading(false);
+    };
+
+    restoreSession();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const refreshToken = async (refreshTokenValue) => {
@@ -71,10 +78,10 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     try {
       const res = await api.post("/api/auth/register", { name, email, password });
-      const { access, refresh, user: userData } = res.data;
+      const { access, refresh } = res.data;
 
-      if (!access) {
-        throw new Error("No token received from server");
+      if (!access || !refresh) {
+        throw new Error("Invalid authentication response from server");
       }
 
       const decoded = jwtDecode(access);
@@ -98,10 +105,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const res = await api.post("/api/auth/login", { email, password });
-      const { access, refresh, user: userData } = res.data;
+      const { access, refresh } = res.data;
 
-      if (!access) {
-        throw new Error("No token received from server");
+      if (!access || !refresh) {
+        throw new Error("Invalid authentication response from server");
       }
 
       const decoded = jwtDecode(access);
@@ -133,7 +140,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("refreshToken");
     setUser(null);
     setToken(null);
-    delete axios.defaults.headers.common["Authorization"];
+    delete api.defaults.headers.common["Authorization"];
     toast.info("Logged out successfully");
   };
 

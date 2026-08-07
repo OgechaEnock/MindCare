@@ -31,7 +31,9 @@ function Register() {
       uppercase: /[A-Z]/.test(form.password),
       lowercase: /[a-z]/.test(form.password),
       digit: /[0-9]/.test(form.password),
-      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~ ]/.test(form.password),
+      special: [...form.password].some((character) =>
+        "!@#$%^&*()_+-=[]{};':\"\\|,.<>/?`~ ".includes(character)
+      ),
     };
     return reqs;
   };
